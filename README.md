@@ -12,12 +12,13 @@ The first milestone is intentionally simple: a non-interactive fuzzy filter that
 
 ## Current status
 
-Implemented skeleton:
+Implemented v0.1 core matcher:
 
-- OCaml/Dune project layout.
-- Basic subsequence fuzzy matcher.
-- Simple scoring function.
+- Case-insensitive subsequence fuzzy matching.
+- Match positions for future highlighting.
+- Numeric scoring and deterministic ranking.
 - CLI entry point that filters stdin using the first command-line argument as the query.
+- Unit tests for matcher behavior.
 
 ## Usage
 
@@ -40,4 +41,8 @@ dune build
 
 ```sh
 dune exec ofzf -- query < candidates.txt
+```
+
+```sh
+dune runtest
 ```

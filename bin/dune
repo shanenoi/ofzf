@@ -1,3 +1,4 @@
 (executable
  (public_name ofzf)
- (name main))
+ (name main)
+ (libraries ofzf))
