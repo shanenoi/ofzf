@@ -1,12 +1,13 @@
 # Architecture
 
-`ofzf` starts as a non-interactive fuzzy filter. The first version keeps the
-program split into two layers:
+`ofzf` is currently a non-interactive fuzzy filter. It reads candidates from
+standard input, ranks matches for a query, and prints only matching lines.
 
 ```text
 stdin lines + argv query
   -> bin/main.ml
   -> Ofzf.Matcher.rank
+  -> Ofzf.Scoring.rank
   -> ranked matching lines on stdout
 ```
 
@@ -26,28 +27,50 @@ selection state.
 
 ### Matcher library
 
-`lib/matcher.ml` owns the core fuzzy-finding behavior:
+`lib/matcher.ml` owns fuzzy matching:
 
 - case-insensitive subsequence matching;
-- zero-based match positions;
-- numeric scoring;
-- deterministic candidate ranking.
+- zero-based byte match positions;
+- a stable public `match_result` API;
+- compatibility wrapper around ranking for the CLI.
 
-This keeps the hot path testable before any interactive UI is introduced.
+### Scoring library
 
-## Data flow
+`lib/scoring.ml` owns relevance scoring and stable ordering:
 
-Candidates are stored as OCaml strings. A successful match returns a small record
-containing the original candidate, the match positions, and the score. The CLI
-prints the original candidate text so existing shell pipelines can consume the
-output directly.
+- consecutive-match bonus;
+- boundary bonus for path, word, bullet, whitespace, and CamelCase boundaries;
+- early-match bonus;
+- candidate-length penalty;
+- tie handling by original input order.
 
-## Future layers
+This separation keeps matching mechanics independent from ranking policy.
 
-Later milestones can build on the matcher without changing its public shape:
+## Ranking behavior
 
-- interactive query updates;
-- top-k ranking instead of full sorting;
-- match highlighting in the renderer;
-- preview windows;
-- multi-select output.
+Candidates that do not match are removed. Matching candidates are scored and
+sorted by descending score. Equal scores preserve the original input order rather
+than alphabetizing. This makes the tool predictable in pipelines where upstream
+order may matter.
+
+## Complexity analysis
+
+For `m` candidates, total input size `N`, query length `q`, and `k` matches:
+
+- matching is `O(N)`;
+- scoring is `O(k * q)`;
+- ranking is `O(k log k)`;
+- memory is `O(m)` for CLI input plus `O(k * q)` for match positions.
+
+No terminal UI exists yet, so there is no rendering loop or raw-mode state.
+
+## Future optimization plan
+
+The architecture leaves room for fzf-style speed improvements:
+
+1. Cache normalized candidate data once after stdin is loaded.
+2. Keep only top-k visible matches for interactive rendering.
+3. Parallelize scoring across chunks.
+4. Add a terminal UI layer above `Matcher.rank`.
+5. Add highlight rendering from match positions.
+6. Add preview windows and multi-select only after the matching core is stable.

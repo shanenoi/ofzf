@@ -12,11 +12,12 @@ The first milestone is intentionally simple: a non-interactive fuzzy filter that
 
 ## Current status
 
-Implemented v0.1 core matcher:
+Implemented v0.2 advanced scoring:
 
 - Case-insensitive subsequence fuzzy matching.
 - Match positions for future highlighting.
-- Numeric scoring and deterministic ranking.
+- Numeric scoring with consecutive, boundary, early-match, and length signals.
+- Stable ranking that preserves input order for equal scores.
 - CLI entry point that filters stdin using the first command-line argument as the query.
 - Unit tests for matcher behavior.
 

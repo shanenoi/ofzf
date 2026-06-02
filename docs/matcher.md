@@ -1,5 +1,9 @@
 # Matcher
 
+`lib/matcher.ml` owns fuzzy subsequence matching. As of v0.2, scoring and stable
+ranking live in `lib/scoring.ml`, while `Matcher` keeps the public API used by
+the CLI and tests.
+
 ## Matching algorithm
 
 The matcher uses case-insensitive subsequence matching. A candidate matches when
@@ -13,13 +17,13 @@ candidate: FuzzyZero
 positions: 0, 2
 ```
 
-This is intentionally cheaper than edit distance. It answers the most important
-question for a fuzzy finder MVP: can the typed characters be found in order?
+This is intentionally cheaper than edit distance. It answers the core question
+for a fuzzy finder: can the typed characters be found in order?
 
 ## Match positions
 
-Successful matches return zero-based positions. Positions are useful now for
-tests and will be useful later for UI highlighting.
+Successful matches return zero-based byte positions. Positions are useful for
+scoring now and for UI highlighting later.
 
 ```ocaml
 Ofzf.Matcher.match_candidate ~query:"fz" ~candidate:"FuzzyZero"
@@ -27,48 +31,50 @@ Ofzf.Matcher.match_candidate ~query:"fz" ~candidate:"FuzzyZero"
 
 returns positions `[0; 2]`.
 
-## Scoring model
+## API
 
-A higher score is better. The v0.1 model is simple and deterministic:
+`Matcher` exposes:
 
-- base score: `query_length * 100`;
-- bonus when a match starts at the beginning of a candidate;
-- bonus when a match starts after a separator such as `/`, `-`, `_`, space, `.`,
-  or `:`;
-- bonus for consecutive matched characters;
-- penalty for later first match;
-- penalty for longer candidates.
+- `match_candidate` for a single candidate;
+- `matches` for a boolean check;
+- `rank` for filtering and ranked output.
 
-This makes compact and natural-looking matches rise above loose matches while
-remaining easy to reason about.
+The record returned by `match_candidate` still includes `candidate`, `positions`,
+and `score`, so existing v0.1 callers do not need to change.
 
-## Ranking
+## Relationship to scoring
 
-`rank` filters out non-matching candidates, then sorts remaining candidates by
-descending score. Ties use candidate text in ascending order so output is stable.
+`Matcher` finds positions. It delegates numeric scoring and stable ranking to
+`Scoring`.
+
+```text
+candidate + query
+  -> Matcher.find_positions
+  -> Scoring.score
+  -> Matcher.match_result
+```
+
+This split keeps matching easy to test independently and makes future scoring
+experiments safer.
 
 ## Complexity analysis
 
 For a query of length `q`, candidate length `n`, and `m` candidates:
 
 - matching one candidate is `O(n)`;
-- scoring one successful candidate is `O(q)`;
-- filtering all candidates is `O(total_input_characters)`;
-- sorting matched candidates is `O(k log k)`, where `k` is the number of
-  matches.
-
-The memory cost is `O(k * q)` for match result records and position lists, plus
-the input lines already held by the CLI.
+- matching all candidates is `O(total_input_characters)`;
+- storing positions costs `O(q)` per successful match;
+- ranking matched candidates adds `O(k log k)` in `Scoring`, where `k` is the
+  number of matches.
 
 ## Future optimization plan
 
-The current implementation favors clarity. Later optimization passes can improve
-large-input behavior without changing the user-facing CLI:
+The current matcher favors clarity. Later work can optimize without changing the
+CLI contract:
 
-1. Store lowercased candidates once instead of lowercasing on every query.
-2. Reuse arrays or buffers for match positions to reduce allocation pressure.
-3. Keep only the top visible results with a bounded heap instead of sorting every
-   match.
-4. Parallelize matching across candidate chunks.
-5. Add early bailouts when the remaining candidate cannot satisfy the remaining
-   query.
+1. Cache lowercase candidate strings.
+2. Reuse buffers for positions.
+3. Add early rejection when the remaining candidate is shorter than the
+   remaining query.
+4. Support top-k matching so interactive rendering does not sort every match.
+5. Keep match positions in arrays to reduce list allocation overhead.

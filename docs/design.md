@@ -33,23 +33,23 @@ stdin candidates
 - Accept query from command-line argument.
 - Print ranked matches.
 
-### v0.2: Interactive query loop
+### v0.2: Advanced scoring
+
+- Separate scoring from matching.
+- Add consecutive, boundary, early-match, and length-based score signals.
+- Preserve input order for ties.
+
+### v0.3: Interactive query loop
 
 - Put terminal in raw mode.
 - Capture typed characters.
 - Redraw top visible matches.
 
-### v0.3: Selection
+### v0.4: Selection
 
 - Arrow-key navigation.
 - Enter prints selected item.
 - Escape exits.
-
-### v0.4: Better scoring
-
-- Bonus for consecutive matches.
-- Bonus for word/path boundaries.
-- Penalty for late starts and long candidates.
 
 ### v0.5: Large-input optimization
 
