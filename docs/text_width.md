@@ -91,3 +91,10 @@ File preview lines use the same display-width clipping path as interactive
 result rows and prompts. The preview loader normalizes CRLF/LF line endings and
 passes each line through `Text_width.clip`, so long file lines and Unicode paths
 stay within the preview pane without byte-length clipping.
+
+## Debug and safety boundary
+
+`Text_width` stays pure and does not log directly. Debugging output from render
+or interactive code may report that ANSI-aware width helpers were used, but it
+must not include full candidate or preview file contents. Width helpers remain
+focused on display-column calculations and UTF-8-safe clipping.

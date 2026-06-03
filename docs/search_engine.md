@@ -94,3 +94,9 @@ For full input size `N`, previous matching subset size `P`, final match count
 
 Incremental search is most valuable when each typed character sharply reduces
 `P`, which is common for file paths and symbol-like candidates.
+
+## Debug behavior
+
+Search-engine statistics are surfaced by the CLI when `OFZF_DEBUG=1` is set.
+Debug logs report aggregate counts such as matched candidates, cache hits,
+cache misses, and reuse counts. They do not print full candidate lists.

@@ -21,3 +21,14 @@ frame generation deterministic and unit-testable.
 
 ANSI escape sequences are contained in terminal-facing modules. Core matching,
 scoring, search, and cache code remain unaware of UI styling.
+
+## Test and debug boundary
+
+Rendering tests live in `test/render_test.ml`. They verify ANSI highlighting,
+selected-row styling, right/bottom preview composition, Unicode clipping, and
+empty-result output. Rendering receives already-loaded `Preview.content`; a test
+asserts that rendering a file-path candidate without content does not load or
+print file contents.
+
+Debug mode is owned outside `Render`. Render functions remain pure and do not
+write logs themselves.

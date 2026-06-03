@@ -1,7 +1,8 @@
 # Technical Debt Notes
 
-Technical Debt Pass 2 split the former interactive god module into smaller pure
-modules and added the foundation for later performance work.
+Technical Debt Pass 3 keeps the Pass 2 module split, reorganizes tests by module
+ownership, adds optional process-level CLI smoke tests, and introduces minimal
+debug logging for future troubleshooting.
 
 Completed in this pass:
 
@@ -14,6 +15,13 @@ Completed in this pass:
 - search no longer matches once for filtering and again for ranking in the
   search-engine path;
 - `Query_cache` now has deterministic bounded growth.
+- tests are split by ownership: matcher, scoring, top-k, CLI, text width,
+  preview, interactive helpers, rendering, query editing, selection, viewport,
+  preview state, search engine, and query cache;
+- `cli_process_test` can exercise a compiled binary when `OFZF_TEST_BIN` is set;
+- small preview fixtures cover Unicode names, long names, CRLF, binary-looking
+  content, directories, and missing paths;
+- `OFZF_DEBUG=1` writes concise diagnostics to stderr without changing stdout.
 
 Deferred work:
 
@@ -21,5 +29,14 @@ Deferred work:
 - ioctl-based terminal size detection instead of `stty`;
 - signal-driven resize handling;
 - process-level Dune/CLI integration tests;
+- always-on process-level tests in Dune without needing `OFZF_TEST_BIN`;
 - full grapheme-aware query editing;
 - command-based preview with a safe command model.
+
+Recommended next cleanup order:
+
+1. add an ioctl terminal-size path and keep `stty` as fallback;
+2. add signal-aware resize redraws;
+3. add a heap-backed Top-K implementation for large `K`;
+4. add command-preview design docs before implementing any shell-facing feature;
+5. revisit query editing with full grapheme-cluster behavior.

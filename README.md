@@ -13,7 +13,8 @@ original non-interactive fuzzy-filter behavior.
 
 ## Current status
 
-Implemented through v0.12 Preview File Content + Preview Scrolling:
+Implemented through v0.12 Preview File Content + Preview Scrolling plus three
+technical-debt stabilization passes:
 
 - Case-insensitive subsequence fuzzy matching.
 - Match positions for future highlighting.
@@ -58,6 +59,10 @@ Implemented through v0.12 Preview File Content + Preview Scrolling:
   incremental-session memory growth.
 - The search-engine path carries successful matches through ranking so it avoids
   matching once for filtering and again for ranking where practical.
+- The test suite is split by module/feature ownership and includes optional
+  process-level CLI smoke tests when `OFZF_TEST_BIN` points at a compiled binary.
+- `OFZF_DEBUG=1` enables concise debug logs on stderr without changing normal
+  stdout output.
 - Preview panes classify directories, missing paths, unreadable files, and
   binary-looking files with clear messages.
 - Preview scrolling supports Alt-Up/Alt-Down, Ctrl-Y/Ctrl-E, and Ctrl-B/Ctrl-F.
@@ -131,6 +136,22 @@ make test
 The test suite is split by module responsibility. `Interactive` keeps terminal
 lifecycle and event-loop wiring, while pure behavior lives in focused modules
 that can be tested without a real TTY.
+
+Process-level CLI smoke tests can be run against a compiled binary by setting:
+
+```sh
+OFZF_TEST_BIN=_build/default/bin/main.exe dune runtest
+```
+
+Debug logging is opt-in and writes only to stderr:
+
+```sh
+OFZF_DEBUG=1 dune exec ofzf -- he < candidates.txt
+```
+
+Debug logs include mode selection, search/cache statistics, terminal-size/layout
+events, and preview reload/source-kind information. They never log preview file
+contents or full candidate lists.
 
 ## Benchmark
 

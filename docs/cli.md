@@ -175,3 +175,29 @@ Preview scrolling keys:
 - Alt-Down or Ctrl-E scrolls one preview line down;
 - Ctrl-B scrolls one preview page up;
 - Ctrl-F scrolls one preview page down.
+
+## Option compatibility rules
+
+The CLI parser validates option combinations after parsing raw flags, so order
+does not change behavior.
+
+- `--bench --limit N QUERY` is valid and benchmarks limited ranking.
+- `--preview-position right|bottom` requires `--preview`.
+- `--preview --bench QUERY` and `--bench --preview QUERY` are both rejected.
+- `--preview --limit N QUERY` is rejected because preview is interactive and
+  `--limit` belongs to non-interactive/benchmark top-k paths.
+- invalid `--preview-position` values are rejected before interactive mode starts.
+
+## Debug mode
+
+`OFZF_DEBUG=1` enables concise diagnostic logs on stderr. Debug mode does not
+change stdout, which remains reserved for ranked candidates in non-interactive
+mode or the selected candidate in interactive mode. Debug logs avoid file
+contents and large candidate lists.
+
+## Process-level smoke tests
+
+`test/cli_process_test.ml` can exercise a compiled `ofzf` binary when
+`OFZF_TEST_BIN` is set. This keeps normal pure unit tests independent of Dune's
+build directory while still allowing regression checks for stdout/stderr and
+exit status behavior.

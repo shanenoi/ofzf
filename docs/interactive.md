@@ -89,6 +89,11 @@ including very small terminal heights.
 loaded by `Preview_state` when selection changes, then passed into render helpers
 as data.
 
+With `OFZF_DEBUG=1`, the event loop writes concise diagnostics to stderr,
+including terminal size, preview layout choice, selected-candidate changes, and
+preview reload source kind. Debug mode is disabled by default and never logs
+preview file contents or full candidate lists.
+
 When no results are available, the result area shows a helpful empty-results
 message instead of leaving stale rows visible.
 

@@ -1,3 +1,3 @@
 (tests
- (names matcher_test query_edit_test selection_test viewport_test render_test preview_state_test)
- (libraries ofzf))
+ (names matcher_test scoring_test topk_test cli_test text_width_test preview_test interactive_test render_test query_edit_test selection_test viewport_test preview_state_test search_engine_test query_cache_test cli_process_test)
+ (libraries ofzf unix))

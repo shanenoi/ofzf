@@ -20,3 +20,9 @@ Preview state also owns scroll clamping and scroll-key deltas. The scroll offset
 is clamped against the already-loaded line count and visible preview rows. The
 256 KiB preview read cap remains in `Preview`; `Preview_state` only decides when
 that loader is invoked.
+
+## Debug behavior
+
+When `OFZF_DEBUG=1` is set, preview-state updates log selected-candidate reloads
+and preview source kinds to stderr. The log deliberately reports only metadata
+such as source kind and line count. It does not print preview file contents.

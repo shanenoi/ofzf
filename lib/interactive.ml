@@ -156,6 +156,9 @@ let run_loop handle ~preview:handle_preview ~preview_position:handle_preview_pos
     ~initial_query:handle_initial_query candidates =
   let rec loop state =
     let size = Terminal.terminal_size () in
+    Debug.logf "terminal_size rows=%d cols=%d preview=%b layout=%s"
+      size.Terminal.rows size.Terminal.cols state.preview
+      (Preview.position_to_string state.preview_position);
     render handle size state;
     let visible_preview_rows =
       preview_visible_rows ~terminal_height:size.rows ~terminal_width:size.cols
@@ -203,11 +206,13 @@ let run_loop handle ~preview:handle_preview ~preview_position:handle_preview_pos
 
 let run ~preview ~preview_position ~initial_query ~candidates =
   if candidates = [] then (
+    Debug.log "interactive start failed: empty stdin";
     prerr_endline "ofzf: no candidates on stdin for interactive mode";
     1)
   else
     match Terminal.enter_raw_mode () with
     | Error message ->
+        Debug.logf "interactive terminal setup failed: %s" message;
         prerr_endline ("ofzf: cannot start interactive terminal: " ^ message);
         1
     | Ok handle -> (

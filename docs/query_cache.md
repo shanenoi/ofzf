@@ -55,3 +55,8 @@ For `c` cached queries and query length `q`:
 This is acceptable for the current milestone because interactive typing usually
 creates a small number of cached prefixes. A future hash table plus prefix index
 can reduce lookup overhead without changing callers.
+
+## Test coverage
+
+`test/query_cache_test.ml` covers exact cache hits, misses, longest-prefix lookup,
+oldest-entry eviction, and zero-entry cache behavior.

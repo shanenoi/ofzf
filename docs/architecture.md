@@ -30,6 +30,8 @@ stdin candidates + query
 
 ## Components
 
+For a concise ownership table, see `docs/module_ownership.md`.
+
 ### CLI
 
 `bin/main.ml` owns process-level behavior:
@@ -111,6 +113,11 @@ benchmark executable use this engine to measure incremental behavior.
 `lib/cli.ml` parses process arguments and centralizes usage/error messages. It
 keeps command-line behavior testable without spawning a process.
 
+Argument validation is order-independent. Preview is interactive-only, so
+`--preview-position` without `--preview`, `--preview --limit`, and
+`--preview --bench` are rejected with clear errors. `--bench --limit N QUERY`
+remains valid.
+
 ### Benchmark executable
 
 `bench/benchmark.ml` reads candidates from stdin and prints:
@@ -167,6 +174,8 @@ safely.
 `lib/render.ml` owns pure ANSI frame rendering. It consumes already-loaded
 preview content, terminal dimensions, query/result state, and layout decisions.
 It performs no filesystem IO and keeps ANSI concerns out of matcher/search code.
+Right-side preview alignment uses ANSI-aware width accounting so match
+highlighting and selected-row inverse video do not count as visible columns.
 
 ### Preview state
 
@@ -174,6 +183,18 @@ It performs no filesystem IO and keeps ANSI concerns out of matcher/search code.
 `Preview.content`, and preview scroll offset. It reloads preview content only
 when the selected candidate changes, then clamps scroll against the loaded
 content.
+
+This split makes preview filesystem access explicit during state updates. The
+rendering path receives `Preview.content` and cannot trigger additional file
+loads.
+
+### Debugging
+
+`lib/debug.ml` provides opt-in debug logging through `OFZF_DEBUG=1`. Logs go to
+stderr so stdout remains reserved for ranked or selected candidates. Debug logs
+focus on high-level state such as CLI mode, search/cache statistics, terminal
+size/layout, selected-candidate changes, and preview source kind. File contents
+and full candidate lists are intentionally never logged.
 
 ### Interactive UI
 

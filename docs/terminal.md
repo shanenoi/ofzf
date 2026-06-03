@@ -141,3 +141,10 @@ mode:
 
 Unsupported escape sequences still become `Unknown` and are ignored by the
 query editor so control bytes do not corrupt the query.
+
+## Debug diagnostics
+
+`OFZF_DEBUG=1` enables lightweight diagnostics for terminal-facing paths. Logs go
+to stderr and may include detected terminal rows/columns and the selected preview
+layout. Normal stdout output is unchanged. Debug mode is intentionally not a raw
+terminal trace and does not print keypress streams or candidate contents.

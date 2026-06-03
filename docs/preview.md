@@ -49,6 +49,12 @@ The selected candidate is classified before rendering:
 - binary-looking file: omit raw bytes and show a binary message;
 - plain text: show the candidate text itself.
 
+Preview is file-read only. It does not invoke a shell, execute selected
+candidates, expand placeholders, or run user-provided preview commands.
+Symlinks follow the platform's normal `stat` behavior, so a readable symlink
+target may be previewed. Debug logs may include preview source kind and reload
+events, but they must not include preview file contents.
+
 The missing-path vs plain-text decision uses a conservative path heuristic. A
 nonexistent value with path separators, dots, or common relative/home prefixes is
 reported as a missing path; other values fall back to plain text preview.

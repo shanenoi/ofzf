@@ -1,4 +1,5 @@
 let assert_true message value = if not value then failwith message
+let fixture name = Filename.concat "test/fixtures" name
 
 let () =
   let open Ofzf.Preview_state in
@@ -19,4 +20,13 @@ let () =
   assert_true "changed candidate reloads" (!loads = 2);
   assert_true "changed candidate resets scroll" (changed.scroll = 0);
   assert_true "scroll delta line" (scroll_delta ~visible_rows:3 Ofzf.Terminal.Ctrl_e = Some 1);
-  assert_true "scroll delta page" (scroll_delta ~visible_rows:3 Ofzf.Terminal.Ctrl_f = Some 3)
+  assert_true "scroll delta page" (scroll_delta ~visible_rows:3 Ofzf.Terminal.Ctrl_f = Some 3);
+
+  let directory = update default (Some (fixture "preview_dir")) in
+  assert_true "directory content loaded" (directory.content.kind = Ofzf.Preview.Directory);
+  let missing = update default (Some (fixture "missing-file.txt")) in
+  assert_true "missing content loaded" (missing.content.kind = Ofzf.Preview.Missing_path);
+  let plain = update default (Some "plain text candidate") in
+  assert_true "plain fallback content loaded" (plain.content.kind = Ofzf.Preview.Candidate_text);
+  let binary = update default (Some (fixture "binary_like.bin")) in
+  assert_true "binary-looking content loaded" (binary.content.kind = Ofzf.Preview.Binary_file)
