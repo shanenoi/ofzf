@@ -51,3 +51,15 @@ let rank ~query candidates =
   |> List.filter_map Fun.id
   |> Scoring.rank ~query
   |> List.map result_of_scored
+
+
+let rank_top ~query ~k candidates =
+  candidates
+  |> List.mapi (fun original_index candidate ->
+         match find_positions ~query ~candidate with
+         | None -> None
+         | Some positions ->
+             Some Scoring.{ candidate; positions; original_index })
+  |> List.filter_map Fun.id
+  |> Scoring.rank_top ~query ~k
+  |> List.map result_of_scored

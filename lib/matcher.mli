@@ -22,3 +22,7 @@ val matches : query:string -> string -> bool
 (** [rank ~query candidates] filters and sorts candidates by descending score.
     Score ties preserve the original input order. *)
 val rank : query:string -> string list -> match_result list
+
+(** [rank_top ~query ~k candidates] filters candidates and returns at most [k]
+    best ranked matches without fully sorting every matching candidate. *)
+val rank_top : query:string -> k:int -> string list -> match_result list

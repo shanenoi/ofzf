@@ -1,8 +1,8 @@
 # Matcher
 
-`lib/matcher.ml` owns fuzzy subsequence matching. As of v0.2, scoring and stable
-ranking live in `lib/scoring.ml`, while `Matcher` keeps the public API used by
-the CLI and tests.
+`lib/matcher.ml` owns fuzzy subsequence matching. Scoring and stable ranking live
+in `lib/scoring.ml`; bounded ranking lives in `lib/topk.ml`. `Matcher` keeps the
+public API used by the CLI and tests.
 
 ## Matching algorithm
 
@@ -37,10 +37,11 @@ returns positions `[0; 2]`.
 
 - `match_candidate` for a single candidate;
 - `matches` for a boolean check;
-- `rank` for filtering and ranked output.
+- `rank` for filtering and full ranked output;
+- `rank_top` for filtering and returning only the best `K` matches.
 
 The record returned by `match_candidate` still includes `candidate`, `positions`,
-and `score`, so existing v0.1 callers do not need to change.
+and `score`, so existing v0.1/v0.2 callers do not need to change.
 
 ## Relationship to scoring
 
@@ -64,8 +65,9 @@ For a query of length `q`, candidate length `n`, and `m` candidates:
 - matching one candidate is `O(n)`;
 - matching all candidates is `O(total_input_characters)`;
 - storing positions costs `O(q)` per successful match;
-- ranking matched candidates adds `O(k log k)` in `Scoring`, where `k` is the
-  number of matches.
+- full ranking matched candidates adds `O(k log k)` in `Scoring`, where `k` is
+  the number of matches;
+- top-k ranking can keep only `K` results for future interactive views.
 
 ## Future optimization plan
 
@@ -76,5 +78,6 @@ CLI contract:
 2. Reuse buffers for positions.
 3. Add early rejection when the remaining candidate is shorter than the
    remaining query.
-4. Support top-k matching so interactive rendering does not sort every match.
+4. Support streaming top-k matching so interactive rendering does not sort every
+   match.
 5. Keep match positions in arrays to reduce list allocation overhead.

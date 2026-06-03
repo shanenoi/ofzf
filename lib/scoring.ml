@@ -16,6 +16,10 @@ type breakdown = {
   consecutive_bonus : int;
   boundary_bonus : int;
   early_bonus : int;
+  exact_bonus : int;
+  prefix_bonus : int;
+  gap_penalty : int;
+  path_penalty : int;
   length_penalty : int;
   total : int;
 }
@@ -59,24 +63,81 @@ let consecutive_bonus positions =
   loop None 0 positions
 
 let boundary_bonus candidate positions =
-  List.fold_left (fun total position -> total + boundary_bonus_at candidate position) 0
-    positions
+  List.fold_left
+    (fun total position -> total + boundary_bonus_at candidate position)
+    0 positions
 
 let early_bonus positions =
   match positions with
   | [] -> 0
   | first :: _ -> max 0 (64 - (first * 4))
 
+let gap_penalty positions =
+  let rec loop previous total = function
+    | [] -> total
+    | position :: rest ->
+        let gap =
+          match previous with
+          | Some previous -> max 0 (position - previous - 1)
+          | None -> 0
+        in
+        loop (Some position) (total + (gap * 8)) rest
+  in
+  loop None 0 positions
+
+let lowercase_ascii value = String.lowercase_ascii value
+
+let starts_with ~prefix value =
+  let prefix_length = String.length prefix in
+  String.length value >= prefix_length
+  && String.sub value 0 prefix_length = prefix
+
+let exact_bonus ~query ~candidate =
+  if lowercase_ascii query = lowercase_ascii candidate then 160 else 0
+
+let prefix_bonus ~query ~candidate =
+  let query_lower = lowercase_ascii query in
+  let candidate_lower = lowercase_ascii candidate in
+  if query_lower = "" then 0
+  else if starts_with ~prefix:query_lower candidate_lower then 80
+  else 0
+
+let path_penalty candidate positions =
+  match positions with
+  | [] -> 0
+  | first :: _ ->
+      let slash_count = ref 0 in
+      for index = 0 to first - 1 do
+        if candidate.[index] = '/' then incr slash_count
+      done;
+      !slash_count * 16
+
 let score_breakdown ~query ~candidate ~positions =
   let base = String.length query * 100 in
   let consecutive_bonus = consecutive_bonus positions in
   let boundary_bonus = boundary_bonus candidate positions in
   let early_bonus = early_bonus positions in
+  let exact_bonus = exact_bonus ~query ~candidate in
+  let prefix_bonus = prefix_bonus ~query ~candidate in
+  let gap_penalty = gap_penalty positions in
+  let path_penalty = path_penalty candidate positions in
   let length_penalty = String.length candidate in
   let total =
-    base + consecutive_bonus + boundary_bonus + early_bonus - length_penalty
+    base + consecutive_bonus + boundary_bonus + early_bonus + exact_bonus
+    + prefix_bonus - gap_penalty - path_penalty - length_penalty
   in
-  { base; consecutive_bonus; boundary_bonus; early_bonus; length_penalty; total }
+  {
+    base;
+    consecutive_bonus;
+    boundary_bonus;
+    early_bonus;
+    exact_bonus;
+    prefix_bonus;
+    gap_penalty;
+    path_penalty;
+    length_penalty;
+    total;
+  }
 
 let score ~query ~candidate ~positions =
   (score_breakdown ~query ~candidate ~positions).total
@@ -97,3 +158,11 @@ let compare_scored left right =
 
 let rank ~query matches =
   matches |> List.map (score_match ~query) |> List.sort compare_scored
+
+let rank_top ~query ~k matches =
+  matches
+  |> List.map (fun matched ->
+         let scored = score_match ~query matched in
+         Topk.{ value = scored; score = scored.score; original_index = scored.original_index })
+  |> Topk.of_list ~k
+  |> List.map (fun item -> item.Topk.value)

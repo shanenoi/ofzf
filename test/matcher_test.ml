@@ -26,6 +26,12 @@ let ranked_candidates query candidates =
   Ofzf.Matcher.rank ~query candidates
   |> List.map (fun result -> result.Ofzf.Matcher.candidate)
 
+let ranked_top_candidates query k candidates =
+  Ofzf.Matcher.rank_top ~query ~k candidates
+  |> List.map (fun result -> result.Ofzf.Matcher.candidate)
+
+let score query candidate = (require_match query candidate).score
+
 let () =
   assert_true "case-insensitive match"
     (Ofzf.Matcher.matches ~query:"OF" "src/ofzf.ml");
@@ -36,45 +42,63 @@ let () =
   let result = require_match "fz" "FuzzyZero" in
   assert_equal_int_list "match positions" [ 0; 2 ] result.positions;
 
-  let tight = require_match "abc" "abc.txt" in
-  let loose = require_match "abc" "a_b_c.txt" in
-  assert_greater "consecutive matches score higher" tight.score loose.score;
+  assert_greater "consecutive matches score higher" (score "abc" "abc.txt")
+    (score "abc" "a_b_c.txt");
 
-  let boundary = require_match "mat" "src/Matcher.ml" in
-  let embedded = require_match "mat" "src/rematcher.ml" in
-  assert_greater "CamelCase boundary scores higher" boundary.score embedded.score;
+  assert_greater "gap penalty prefers no gap" (score "abc" "abc")
+    (score "abc" "a_bc");
+  assert_greater "gap penalty prefers smaller gap" (score "abc" "a_bc")
+    (score "abc" "a___b___c");
 
-  let slash_boundary = require_match "mat" "src/matcher.ml" in
-  let late_embedded = require_match "mat" "src/prematcher.ml" in
-  assert_greater "slash boundary scores higher" slash_boundary.score
-    late_embedded.score;
+  assert_greater "exact match beats extension" (score "matcher" "matcher")
+    (score "matcher" "matcher.ml");
 
-  let underscore_boundary = require_match "mat" "src/x_matcher.ml" in
-  let underscore_embedded = require_match "mat" "src/xmatcher.ml" in
-  assert_greater "underscore boundary scores higher" underscore_boundary.score
-    underscore_embedded.score;
+  assert_greater "prefix beats nested path" (score "mat" "matcher.ml")
+    (score "mat" "src/matcher.ml");
 
-  let bullet_boundary = require_match "mat" "src/●matcher.ml" in
-  let bullet_embedded = require_match "mat" "src/prematcher.ml" in
-  assert_greater "bullet boundary scores higher" bullet_boundary.score
-    bullet_embedded.score;
+  assert_greater "path-aware scoring prefers shallow basename"
+    (score "matcher" "matcher.ml")
+    (score "matcher" "src/fuzzy/matcher.ml");
 
-  let early = require_match "abc" "abc-later.txt" in
-  let late = require_match "abc" "later-abc.txt" in
-  assert_greater "early match scores higher" early.score late.score;
+  assert_greater "CamelCase boundary scores higher"
+    (score "mat" "src/Matcher.ml")
+    (score "mat" "src/rematcher.ml");
 
-  let short = require_match "abc" "abc.txt" in
-  let long = require_match "abc" "abc-very-long-file-name.txt" in
-  assert_greater "shorter candidate scores higher" short.score long.score;
+  assert_greater "slash boundary scores higher" (score "mat" "src/matcher.ml")
+    (score "mat" "src/prematcher.ml");
+
+  assert_greater "underscore boundary scores higher"
+    (score "mat" "src/x_matcher.ml")
+    (score "mat" "src/xmatcher.ml");
+
+  assert_greater "bullet boundary scores higher" (score "mat" "src/●matcher.ml")
+    (score "mat" "src/prematcher.ml");
+
+  assert_greater "early match scores higher" (score "abc" "abc-later.txt")
+    (score "abc" "later-abc.txt");
+
+  assert_greater "shorter candidate scores higher" (score "abc" "abc.txt")
+    (score "abc" "abc-very-long-file-name.txt");
 
   assert_equal_string_list "ranking correctness"
-    [ "abc.txt"; "a_b_c.txt"; "src/abc.txt"; "later-abc.txt" ]
+    [ "abc.txt"; "a_bc"; "a_b_c.txt"; "src/abc.txt"; "later-abc.txt" ]
     (ranked_candidates "abc"
-       [ "later-abc.txt"; "a_b_c.txt"; "src/abc.txt"; "abc.txt" ]);
+       [ "later-abc.txt"; "a_b_c.txt"; "src/abc.txt"; "abc.txt"; "a_bc" ]);
 
   assert_equal_string_list "stable sorting preserves original order on ties"
     [ "same"; "same"; "same" ]
     (ranked_candidates "sam" [ "same"; "same"; "same" ]);
 
   assert_equal_string_list "stable sorting does not alphabetize ties"
-    [ "aby"; "abx" ] (ranked_candidates "ab" [ "aby"; "abx" ])
+    [ "aby"; "abx" ] (ranked_candidates "ab" [ "aby"; "abx" ]);
+
+  assert_equal_string_list "top-k returns best two in rank order"
+    [ "abc"; "a_bc" ]
+    (ranked_top_candidates "abc" 2
+       [ "a___b___c"; "a_bc"; "abc"; "later-abc" ]);
+
+  assert_equal_string_list "top-k preserves stable ties"
+    [ "same"; "same" ] (ranked_top_candidates "sam" 2 [ "same"; "same"; "same" ]);
+
+  assert_equal_string_list "top-k zero returns no matches" []
+    (ranked_top_candidates "abc" 0 [ "abc" ])

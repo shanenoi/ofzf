@@ -21,6 +21,10 @@ type breakdown = {
   consecutive_bonus : int;
   boundary_bonus : int;
   early_bonus : int;
+  exact_bonus : int;
+  prefix_bonus : int;
+  gap_penalty : int;
+  path_penalty : int;
   length_penalty : int;
   total : int;
 }
@@ -34,6 +38,18 @@ val score_breakdown :
 (** [score ~query ~candidate ~positions] returns only the total score. *)
 val score : query:string -> candidate:string -> positions:int list -> int
 
-(** [rank ~query matches] scores and ranks matches by descending score. Ties
+(** [score_match ~query match_] scores a successful candidate match. *)
+val score_match : query:string -> candidate_match -> scored_match
+
+(** [compare_scored a b] orders better scored matches first. Equal scores keep
+    lower [original_index] first. *)
+val compare_scored : scored_match -> scored_match -> int
+
+(** [rank ~query matches] scores and ranks all matches by descending score. Ties
     preserve [original_index] order. *)
 val rank : query:string -> candidate_match list -> scored_match list
+
+(** [rank_top ~query ~k matches] scores all matches but keeps only the best [k]
+    results without fully sorting every candidate. The returned list is sorted
+    best first. *)
+val rank_top : query:string -> k:int -> candidate_match list -> scored_match list

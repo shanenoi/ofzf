@@ -12,14 +12,16 @@ The first milestone is intentionally simple: a non-interactive fuzzy filter that
 
 ## Current status
 
-Implemented v0.2 advanced scoring:
+Implemented v0.3 ranking engine optimization:
 
 - Case-insensitive subsequence fuzzy matching.
 - Match positions for future highlighting.
-- Numeric scoring with consecutive, boundary, early-match, and length signals.
+- Numeric scoring with consecutive, boundary, early-match, gap, exact-match, prefix, path-depth, and length signals.
 - Stable ranking that preserves input order for equal scores.
+- Top-k ranking support for future interactive views without fully sorting all matches.
+- Benchmark executable for measuring matching and ranking time.
 - CLI entry point that filters stdin using the first command-line argument as the query.
-- Unit tests for matcher behavior.
+- Unit tests for matcher, scoring, ranking, and top-k behavior.
 
 ## Usage
 
@@ -47,3 +49,11 @@ dune exec ofzf -- query < candidates.txt
 ```sh
 dune runtest
 ```
+
+## Benchmark
+
+```sh
+dune exec bench/benchmark.exe -- mat < candidates.txt
+```
+
+The benchmark prints candidate count, query length, matching time, ranking time, and result count.

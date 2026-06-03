@@ -32,7 +32,10 @@ selection state.
 - case-insensitive subsequence matching;
 - zero-based byte match positions;
 - a stable public `match_result` API;
-- compatibility wrapper around ranking for the CLI.
+- compatibility wrappers around full ranking and top-k ranking.
+
+Matcher does not decide ranking policy. It finds positions and delegates score
+calculation to `Scoring`.
 
 ### Scoring library
 
@@ -41,10 +44,35 @@ selection state.
 - consecutive-match bonus;
 - boundary bonus for path, word, bullet, whitespace, and CamelCase boundaries;
 - early-match bonus;
+- gap penalty;
+- exact-match bonus;
+- prefix bonus;
+- path-depth penalty;
 - candidate-length penalty;
 - tie handling by original input order.
 
-This separation keeps matching mechanics independent from ranking policy.
+### Top-k library
+
+`lib/topk.ml` maintains a bounded list of the best results. It orders by
+score descending and then by original input index ascending. This lets future
+interactive views keep only visible results without fully sorting every match.
+
+The current CLI still calls full ranking so its behavior remains unchanged.
+Top-k exists as an engine-level optimization primitive.
+
+### Benchmark executable
+
+`bench/benchmark.ml` reads candidates from stdin and prints:
+
+- candidate count;
+- query length;
+- matching count;
+- matching time;
+- ranking time;
+- ranked count.
+
+This gives each ranking milestone a simple regression check before terminal UI
+exists.
 
 ## Ranking behavior
 
@@ -59,8 +87,14 @@ For `m` candidates, total input size `N`, query length `q`, and `k` matches:
 
 - matching is `O(N)`;
 - scoring is `O(k * q)`;
-- ranking is `O(k log k)`;
+- full ranking is `O(k log k)`;
+- top-k ranking is `O(k * K)` with the current small bounded-list
+  implementation, where `K` is the requested result count;
 - memory is `O(m)` for CLI input plus `O(k * q)` for match positions.
+
+The top-k implementation avoids allocating a full sorted result list when a
+caller only needs the best `K` candidates. A future heap can reduce the top-k
+bound to `O(k log K)` while preserving the same public API.
 
 No terminal UI exists yet, so there is no rendering loop or raw-mode state.
 
@@ -69,8 +103,10 @@ No terminal UI exists yet, so there is no rendering loop or raw-mode state.
 The architecture leaves room for fzf-style speed improvements:
 
 1. Cache normalized candidate data once after stdin is loaded.
-2. Keep only top-k visible matches for interactive rendering.
-3. Parallelize scoring across chunks.
-4. Add a terminal UI layer above `Matcher.rank`.
-5. Add highlight rendering from match positions.
-6. Add preview windows and multi-select only after the matching core is stable.
+2. Replace list positions with arrays or reusable buffers on hot paths.
+3. Upgrade top-k from bounded insertion list to a binary heap for large `K`.
+4. Parallelize scoring across chunks.
+5. Add early bailouts when a candidate cannot beat the top-k threshold.
+6. Add a terminal UI layer above `Matcher.rank_top`.
+7. Add highlight rendering from match positions.
+8. Add preview windows and multi-select only after the matching core is stable.
