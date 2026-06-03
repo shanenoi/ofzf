@@ -152,8 +152,15 @@ cat input.txt | ofzf --preview --preview-position bottom mat
 ```
 
 `--preview-position` accepts `right` or `bottom`. Invalid values exit non-zero
-with a clear message. External preview commands, shell expansion, and `{}`
-placeholder expansion are intentionally out of scope for v0.12.
+with a clear message. `--preview-position` is valid only when `--preview` is
+also present. `--preview` is intentionally rejected with `--bench` and with
+`--limit N`; benchmark mode and top-k streaming mode stay non-interactive.
+External preview commands, shell expansion, and `{}` placeholder expansion are
+intentionally out of scope.
+
+The validation pass is order-independent: `--bench --preview QUERY` and
+`--preview --bench QUERY` fail with the same conflict, and valid preview-position
+forms work regardless of option order.
 
 Preview scrolling keys:
 

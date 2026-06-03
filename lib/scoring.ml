@@ -142,13 +142,13 @@ let score_breakdown ~query ~candidate ~positions =
 let score ~query ~candidate ~positions =
   (score_breakdown ~query ~candidate ~positions).total
 
-let score_match ~query (matched : candidate_match) =
-  let score = score ~query ~candidate:matched.candidate ~positions:matched.positions in
+let score_match ~query ({ candidate; positions; original_index } : candidate_match) =
+  let score = score ~query ~candidate ~positions in
   {
-    candidate = matched.candidate;
-    positions = matched.positions;
+    candidate;
+    positions;
     score;
-    original_index = matched.original_index;
+    original_index;
   }
 
 let compare_scored left right =
@@ -163,6 +163,8 @@ let rank_top ~query ~k matches =
   matches
   |> List.map (fun matched ->
          let scored = score_match ~query matched in
-         Topk.{ value = scored; score = scored.score; original_index = scored.original_index })
+         let score = scored.score in
+         let original_index = scored.original_index in
+         { Topk.value = scored; score; original_index })
   |> Topk.of_list ~k
   |> List.map (fun item -> item.Topk.value)

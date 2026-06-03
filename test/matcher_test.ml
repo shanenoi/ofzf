@@ -203,6 +203,8 @@ let () =
     { query = "abc"; limit = None; mode = Bench; preview = false; preview_position = Preview_right };
   assert_cli_ok "parse bench with limit" [ "ofzf"; "--bench"; "--limit"; "2"; "abc" ]
     { query = "abc"; limit = Some 2; mode = Bench; preview = false; preview_position = Preview_right };
+  assert_cli_ok "parse bench with limit in any order" [ "ofzf"; "--limit"; "2"; "--bench"; "abc" ]
+    { query = "abc"; limit = Some 2; mode = Bench; preview = false; preview_position = Preview_right };
   assert_cli_error "bench missing query" [ "ofzf"; "--bench" ];
   assert_cli_error "limit missing query" [ "ofzf"; "--limit"; "2" ];
   assert_cli_error "invalid limit" [ "ofzf"; "--limit"; "wat"; "abc" ];
@@ -216,7 +218,13 @@ let () =
     { query = "abc"; limit = None; mode = Interactive; preview = true; preview_position = Preview_right };
   assert_cli_ok "parse preview bottom" [ "ofzf"; "--preview"; "--preview-position"; "bottom"; "abc" ]
     { query = "abc"; limit = None; mode = Interactive; preview = true; preview_position = Preview_bottom };
+  assert_cli_ok "parse preview bottom in any order" [ "ofzf"; "--preview-position"; "bottom"; "--preview"; "abc" ]
+    { query = "abc"; limit = None; mode = Interactive; preview = true; preview_position = Preview_bottom };
   assert_cli_error "invalid preview position" [ "ofzf"; "--preview"; "--preview-position"; "side"; "abc" ];
+  assert_cli_error "preview position without preview" [ "ofzf"; "--preview-position"; "right"; "abc" ];
+  assert_cli_error "bench preview rejected" [ "ofzf"; "--bench"; "--preview"; "abc" ];
+  assert_cli_error "preview bench rejected regardless of order" [ "ofzf"; "--preview"; "--bench"; "abc" ];
+  assert_cli_error "preview limit rejected" [ "ofzf"; "--preview"; "--limit"; "2"; "abc" ];
 
   assert_equal_key "parse arrow up" Ofzf.Terminal.Arrow_up
     (Ofzf.Terminal.parse_key_sequence "\027[A");
@@ -333,6 +341,12 @@ let () =
     = 3);
   assert_true "byte index for display column returns UTF-8 boundary"
     (Ofzf.Text_width.byte_index_for_display_column ~column:2 "a界b" = 1);
+  assert_equal_string "ANSI stripping removes CSI sequences" "match"
+    (Ofzf.Text_width.strip_ansi (Ofzf.Terminal.inverse ^ "match" ^ Ofzf.Terminal.reset));
+  assert_true "ANSI display width ignores style bytes"
+    (Ofzf.Text_width.display_width_ansi
+       (Ofzf.Terminal.inverse ^ Ofzf.Terminal.highlight ^ "界a" ^ Ofzf.Terminal.reset)
+    = 3);
 
   let prompt_view =
     Ofzf.Interactive.render_prompt ~cursor_byte:(String.length "abcdef")
@@ -515,6 +529,14 @@ let () =
     (starts_with ~prefix:Ofzf.Terminal.inverse unicode_selected);
   assert_true "UTF-8 selected clipped row resets styling"
     (ends_with ~suffix:Ofzf.Terminal.reset unicode_selected);
+  assert_true "highlighted row width ignores ANSI"
+    (Ofzf.Text_width.display_width_ansi
+       (Ofzf.Interactive.render_result_line ~terminal_width:7 ~selected:false highlight_result)
+    <= 7);
+  assert_true "selected highlighted row width ignores ANSI"
+    (Ofzf.Text_width.display_width_ansi
+       (Ofzf.Interactive.render_result_line ~terminal_width:7 ~selected:true highlight_result)
+    <= 7);
 
   let render_lines =
     Ofzf.Interactive.render_lines ~terminal_height:4 ~query:"mat" ~selected:1
@@ -560,6 +582,60 @@ let () =
   in
   assert_true "empty preview shows no selected message"
     (List.exists (contains_substring ~needle:"no selected result") empty_preview_lines);
+  let many_results =
+    List.init 10 (fun index ->
+        Ofzf.Matcher.{ candidate = Printf.sprintf "item%d" index; positions = []; score = 0 })
+  in
+  let right_bottom_selected =
+    Ofzf.Interactive.render_lines ~terminal_height:8 ~terminal_width:80 ~preview:true
+      ~preview_position:Ofzf.Preview.Right ~query:"" ~selected:9 many_results
+  in
+  assert_true "right preview keeps bottom selection visible"
+    (List.exists (contains_substring ~needle:"item9") right_bottom_selected);
+  let right_top_selected =
+    Ofzf.Interactive.render_lines ~terminal_height:8 ~terminal_width:80 ~preview:true
+      ~preview_position:Ofzf.Preview.Right ~query:"" ~selected:0 many_results
+  in
+  assert_true "right preview keeps top selection visible"
+    (List.exists (contains_substring ~needle:"item0") right_top_selected);
+  let bottom_bottom_selected =
+    Ofzf.Interactive.render_lines ~terminal_height:12 ~terminal_width:80 ~preview:true
+      ~preview_position:Ofzf.Preview.Bottom ~query:"" ~selected:9 many_results
+  in
+  assert_true "bottom preview keeps bottom selection visible"
+    (List.exists (contains_substring ~needle:"item9") bottom_bottom_selected);
+  let bottom_top_selected =
+    Ofzf.Interactive.render_lines ~terminal_height:12 ~terminal_width:80 ~preview:true
+      ~preview_position:Ofzf.Preview.Bottom ~query:"" ~selected:0 many_results
+  in
+  assert_true "bottom preview keeps top selection visible"
+    (List.exists (contains_substring ~needle:"item0") bottom_top_selected);
+  let tiny_width_lines =
+    Ofzf.Interactive.render_lines ~terminal_height:4 ~terminal_width:10 ~preview:true
+      ~preview_position:Ofzf.Preview.Right ~query:"" ~selected:0 [ highlight_result ]
+  in
+  assert_true "tiny preview width falls back safely" (List.length tiny_width_lines <= 4);
+
+  let load_count = ref 0 in
+  let loader selected =
+    incr load_count;
+    match selected with
+    | None -> Ofzf.Preview.no_selection_content
+    | Some value -> Ofzf.Preview.content_of_candidate_text value
+  in
+  let first_preview_state =
+    Ofzf.Interactive.update_preview_state ~loader Ofzf.Interactive.default_preview_state
+      (Some "alpha")
+  in
+  let second_preview_state =
+    Ofzf.Interactive.update_preview_state ~loader first_preview_state (Some "alpha")
+  in
+  assert_true "preview state does not reload unchanged selection" (!load_count = 1);
+  let third_preview_state =
+    Ofzf.Interactive.update_preview_state ~loader second_preview_state (Some "beta")
+  in
+  assert_true "preview state reloads changed selection" (!load_count = 2);
+  assert_true "preview state resets scroll on changed selection" (third_preview_state.scroll = 0);
 
   with_temp_dir (fun temp_dir ->
       let file_path = Filename.concat temp_dir "preview.txt" in
@@ -608,19 +684,22 @@ let () =
       let file_result = Ofzf.Matcher.{ candidate = file_path; positions = []; score = 0 } in
       let right_file_preview =
         Ofzf.Interactive.render_lines ~terminal_height:10 ~terminal_width:80 ~preview:true
-          ~preview_position:Ofzf.Preview.Right ~query:"" ~selected:0 [ file_result ]
+          ~preview_position:Ofzf.Preview.Right ~preview_content:file_content
+          ~query:"" ~selected:0 [ file_result ]
       in
       assert_true "right preview renders file content"
         (List.exists (contains_substring ~needle:"line1") right_file_preview);
       let bottom_file_preview =
         Ofzf.Interactive.render_lines ~terminal_height:14 ~terminal_width:80 ~preview:true
-          ~preview_position:Ofzf.Preview.Bottom ~query:"" ~selected:0 [ file_result ]
+          ~preview_position:Ofzf.Preview.Bottom ~preview_content:file_content
+          ~query:"" ~selected:0 [ file_result ]
       in
       assert_true "bottom preview renders file content"
         (List.exists (contains_substring ~needle:"line1") bottom_file_preview);
       let scrolled_preview =
         Ofzf.Interactive.render_lines ~terminal_height:10 ~terminal_width:80 ~preview:true
-          ~preview_position:Ofzf.Preview.Right ~preview_scroll:1 ~query:"" ~selected:0
+          ~preview_position:Ofzf.Preview.Right ~preview_content:file_content
+          ~preview_scroll:1 ~query:"" ~selected:0
           [ file_result ]
       in
       assert_true "preview scroll shows later lines"
@@ -630,7 +709,13 @@ let () =
           ~query:"" ~selected:0 [ file_result ]
       in
       assert_true "preview disabled omits file preview content"
-        (not (List.exists (contains_substring ~needle:"line1") disabled_preview)));
+        (not (List.exists (contains_substring ~needle:"line1") disabled_preview));
+      let pure_render_without_content =
+        Ofzf.Interactive.render_lines ~terminal_height:10 ~terminal_width:80 ~preview:true
+          ~preview_position:Ofzf.Preview.Right ~query:"" ~selected:0 [ file_result ]
+      in
+      assert_true "rendering does not load preview files by itself"
+        (not (List.exists (contains_substring ~needle:"line1") pure_render_without_content)));
 
   let none_selected, none_code = Ofzf.Interactive.selected_result ~selected:0 [] in
   assert_true "enter with no result has no selected output" (none_selected = None);

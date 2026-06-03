@@ -22,9 +22,9 @@ let find_positions ~query ~candidate =
 
 let result_of_scored (scored : Scoring.scored_match) =
   {
-    candidate = scored.candidate;
-    positions = scored.positions;
-    score = scored.score;
+    candidate = scored.Scoring.candidate;
+    positions = scored.Scoring.positions;
+    score = scored.Scoring.score;
   }
 
 let match_candidate ~query ~candidate =

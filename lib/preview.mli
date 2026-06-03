@@ -56,6 +56,9 @@ val compute_layout :
   terminal_rows:int -> terminal_cols:int -> preview:bool -> position:position -> layout
 (** Compute result/preview areas after the two-line prompt/status header. *)
 
+val disabled : int -> int -> layout
+(** Layout helper for a disabled preview pane. *)
+
 val looks_like_path : string -> bool
 (** Heuristic used to distinguish missing paths from plain text. *)
 
@@ -71,8 +74,14 @@ val is_binary_looking : string -> bool
 val normalize_lines : string -> string list
 (** Normalize CRLF/LF content into preview lines. *)
 
+val content_of_candidate_text : string -> content
+(** Build preview content for a candidate that should be rendered as plain text. *)
+
 val content_for_selection : max_bytes:int -> string option -> content
 (** Load preview content for the selected candidate without shell execution. *)
+
+val no_selection_content : content
+(** Prebuilt content for the no-selection preview state. *)
 
 val content_line_count : content -> int
 val clamp_scroll : scroll:int -> line_count:int -> visible_rows:int -> int

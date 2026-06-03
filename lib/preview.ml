@@ -108,7 +108,8 @@ let classify_candidate candidate =
             Regular_file_path candidate
           with Unix.Unix_error _ -> Unreadable_path_value candidate)
       | Unix.S_DIR -> Directory_path candidate
-      | _ -> Plain_text_value candidate
+      | Unix.S_CHR | Unix.S_BLK | Unix.S_LNK | Unix.S_FIFO | Unix.S_SOCK ->
+          Plain_text_value candidate
     with
     | Unix.Unix_error (Unix.ENOENT, _, _) | Unix.Unix_error (Unix.ENOTDIR, _, _) ->
         if looks_like_path candidate then Missing_path_value candidate else Plain_text_value candidate
@@ -171,14 +172,16 @@ let normalize_lines value =
 let content_of_candidate_text candidate =
   { kind = Candidate_text; title = "candidate text"; lines = [ candidate ]; truncated = false }
 
+let no_selection_content =
+  {
+    kind = No_selection;
+    title = "no selected result";
+    lines = [ "preview: no selected result" ];
+    truncated = false;
+  }
+
 let content_for_selection ~max_bytes = function
-  | None ->
-      {
-        kind = No_selection;
-        title = "no selected result";
-        lines = [ "preview: no selected result" ];
-        truncated = false;
-      }
+  | None -> no_selection_content
   | Some candidate -> (
       match classify_candidate candidate with
       | Plain_text_value value -> content_of_candidate_text value

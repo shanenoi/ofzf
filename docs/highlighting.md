@@ -54,11 +54,12 @@ signals:
 
 ## Clipped rows
 
-Long candidates are clipped before being written to the terminal. Clipping is
-byte-based because matcher positions are currently byte offsets. ANSI escape
-sequences are emitted only around visible bytes, so hidden matched characters do
-not leak styling into the output. Prompt and status rows use plain clipping;
-candidate rows use highlight-aware clipping.
+Long candidates are clipped before being written to the terminal. Clipping uses
+`Text_width` display cells instead of raw byte length. Matcher positions remain
+byte offsets, so a decoded cell is highlighted when one of its bytes is matched.
+ANSI escape sequences are emitted only around visible cells, so hidden matched
+characters do not leak styling into the output. Prompt, status, and candidate
+rows all use width-aware clipping.
 
 ## Complexity
 

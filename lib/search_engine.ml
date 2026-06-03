@@ -121,7 +121,8 @@ let incremental_search ?limit ~context ~query candidates =
   | None ->
       let cache_source =
         match Query_cache.longest_prefix ~query context.cache with
-        | Some entry when entry.query <> query -> Some entry.results
+        | Some (entry : string Query_cache.entry) when entry.Query_cache.query <> query ->
+            Some entry.Query_cache.results
         | _ -> None
       in
       let previous_source =

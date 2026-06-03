@@ -127,6 +127,32 @@ let sanitize text =
 let display_width ?(tab_width = 4) text =
   cells ~tab_width text |> List.fold_left (fun total cell -> total + cell.width) 0
 
+let is_ansi_final_byte char =
+  let code = Char.code char in
+  code >= 0x40 && code <= 0x7e
+
+let strip_ansi text =
+  let buffer = Buffer.create (String.length text) in
+  let length = String.length text in
+  let rec loop index =
+    if index < length then
+      if text.[index] = '\027' && index + 1 < length && text.[index + 1] = '[' then
+        let rec skip cursor =
+          if cursor >= length then length
+          else if is_ansi_final_byte text.[cursor] then cursor + 1
+          else skip (cursor + 1)
+        in
+        loop (skip (index + 2))
+      else (
+        Buffer.add_char buffer text.[index];
+        loop (index + 1))
+  in
+  loop 0;
+  Buffer.contents buffer
+
+let display_width_ansi ?(tab_width = 4) text =
+  display_width ~tab_width (strip_ansi text)
+
 let display_width_until_byte ?(tab_width = 4) ~byte_index text =
   cells ~tab_width text
   |> List.fold_left

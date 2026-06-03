@@ -31,6 +31,13 @@ val display_width : ?tab_width:int -> string -> int
 (** Best-effort terminal display width. ANSI escape sequences are not parsed;
     callers should not pass styled strings. *)
 
+val strip_ansi : string -> string
+(** Remove simple CSI ANSI escape sequences from a rendered terminal string. *)
+
+val display_width_ansi : ?tab_width:int -> string -> int
+(** Best-effort display width for styled terminal strings. ANSI CSI sequences do
+    not count as visible columns. *)
+
 val display_width_until_byte : ?tab_width:int -> byte_index:int -> string -> int
 (** Display width before [byte_index], counting only complete decoded cells. *)
 

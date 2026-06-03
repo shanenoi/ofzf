@@ -1,3 +1,9 @@
+type preview_state = {
+  selected_candidate : string option;
+  content : Preview.content;
+  scroll : int;
+}
+
 type state = {
   query : string;
   context : Search_engine.search_context;
@@ -5,7 +11,7 @@ type state = {
   selected : int;
   preview : bool;
   preview_position : Preview.position;
-  preview_scroll : int;
+  preview_state : preview_state;
 }
 
 let header_rows = 2
@@ -15,8 +21,8 @@ let result_rows ~terminal_height = max 0 (terminal_height - header_rows)
 let clamp_selection ~selected ~result_count =
   if result_count <= 0 then 0 else min (result_count - 1) (max 0 selected)
 
-let visible_window ~selected ~terminal_height ~result_count =
-  let rows = result_rows ~terminal_height in
+let visible_window_for_rows ~selected ~visible_rows ~result_count =
+  let rows = max 0 visible_rows in
   if result_count <= 0 || rows <= 0 then (0, 0)
   else
     let selected = clamp_selection ~selected ~result_count in
@@ -25,8 +31,10 @@ let visible_window ~selected ~terminal_height ~result_count =
     let stop = min result_count (start + rows) in
     (start, stop)
 
-let clip_plain ~terminal_width text =
-  Text_width.clip ~width:terminal_width text
+let visible_window ~selected ~terminal_height ~result_count =
+  visible_window_for_rows ~selected ~visible_rows:(result_rows ~terminal_height) ~result_count
+
+let clip_plain ~terminal_width text = Text_width.clip ~width:terminal_width text
 
 let render_prompt ~cursor_byte ~terminal_width ~query =
   Text_width.prompt_view ~terminal_width ~cursor_byte query
@@ -91,21 +99,22 @@ let empty_results_message ~query =
   if query = "" then "(no candidates match the empty query)"
   else Printf.sprintf "(no matches for %S)" query
 
-let is_cell_position positions cell =
+let is_cell_position positions (cell : Text_width.cell) =
   List.exists
-    (fun position -> position >= cell.Text_width.byte_start && position < cell.byte_end)
+    (fun position -> position >= cell.byte_start && position < cell.byte_end)
     positions
+
+let render_cell buffer ~selected ~positions (cell : Text_width.cell) =
+  if is_cell_position positions cell then (
+    Buffer.add_string buffer Terminal.highlight;
+    Buffer.add_string buffer cell.text;
+    Buffer.add_string buffer
+      (if selected then Terminal.selected_end_highlight else Terminal.end_highlight))
+  else Buffer.add_string buffer cell.text
 
 let render_candidate ~selected ~positions ~candidate =
   let buffer = Buffer.create (String.length candidate + (List.length positions * 16)) in
-  Text_width.cells candidate
-  |> List.iter (fun cell ->
-         if is_cell_position positions cell then (
-           Buffer.add_string buffer Terminal.highlight;
-           Buffer.add_string buffer cell.text;
-           Buffer.add_string buffer
-             (if selected then Terminal.selected_end_highlight else Terminal.end_highlight))
-         else Buffer.add_string buffer cell.text);
+  List.iter (render_cell buffer ~selected ~positions) (Text_width.cells candidate);
   Buffer.contents buffer
 
 let render_candidate_clipped ~terminal_width ~selected ~positions ~candidate =
@@ -114,23 +123,13 @@ let render_candidate_clipped ~terminal_width ~selected ~positions ~candidate =
     let buffer = Buffer.create (min terminal_width (String.length candidate) + (List.length positions * 16)) in
     let rec loop used = function
       | [] -> ()
-      | cell :: rest ->
-          let next_used = used + cell.Text_width.width in
+      | (cell : Text_width.cell) :: rest ->
+          let next_used = used + cell.width in
           if cell.width = 0 then (
-            if is_cell_position positions cell then (
-              Buffer.add_string buffer Terminal.highlight;
-              Buffer.add_string buffer cell.text;
-              Buffer.add_string buffer
-                (if selected then Terminal.selected_end_highlight else Terminal.end_highlight))
-            else Buffer.add_string buffer cell.text;
+            render_cell buffer ~selected ~positions cell;
             loop used rest)
           else if next_used <= terminal_width then (
-            if is_cell_position positions cell then (
-              Buffer.add_string buffer Terminal.highlight;
-              Buffer.add_string buffer cell.text;
-              Buffer.add_string buffer
-                (if selected then Terminal.selected_end_highlight else Terminal.end_highlight))
-            else Buffer.add_string buffer cell.text;
+            render_cell buffer ~selected ~positions cell;
             loop next_used rest)
           else ()
     in
@@ -155,34 +154,63 @@ let selected_result ~selected results =
   in
   loop 0 results
 
-let recompute candidates state query =
-  let search =
-    Search_engine.incremental_search ~context:state.context ~query candidates
-  in
-  let result_count = List.length search.results in
+let selected_candidate_text ~selected results =
+  match fst (selected_result ~selected results) with
+  | None -> None
+  | Some result -> Some result.Matcher.candidate
+
+let default_preview_state =
   {
-    state with
-    query;
-    context = search.context;
-    results = search.results;
-    selected = clamp_selection ~selected:state.selected ~result_count;
-    preview_scroll = 0;
+    selected_candidate = None;
+    content = Preview.no_selection_content;
+    scroll = 0;
   }
+
+let load_preview_content selected_candidate =
+  Preview.content_for_selection ~max_bytes:Preview.max_preview_bytes selected_candidate
+
+let update_preview_state ?(loader = load_preview_content) previous selected_candidate =
+  if previous.selected_candidate = selected_candidate then previous
+  else { selected_candidate; content = loader selected_candidate; scroll = 0 }
+
+let sync_preview_state ?loader state =
+  if not state.preview then { state with preview_state = default_preview_state }
+  else
+    let selected_candidate = selected_candidate_text ~selected:state.selected state.results in
+    let preview_state = update_preview_state ?loader state.preview_state selected_candidate in
+    { state with preview_state }
+
+let recompute candidates state query =
+  let search = Search_engine.incremental_search ~context:state.context ~query candidates in
+  let result_count = List.length search.results in
+  let state =
+    {
+      state with
+      query;
+      context = search.context;
+      results = search.results;
+      selected = clamp_selection ~selected:state.selected ~result_count;
+    }
+  in
+  sync_preview_state state
 
 let initial_state ?(preview = false) ?(preview_position = Preview.Right) ?(initial_query = "") candidates =
   let search =
     Search_engine.incremental_search ~context:Search_engine.empty_context
       ~query:initial_query candidates
   in
-  {
-    query = initial_query;
-    context = search.context;
-    results = search.results;
-    selected = 0;
-    preview;
-    preview_position;
-    preview_scroll = 0;
-  }
+  let state =
+    {
+      query = initial_query;
+      context = search.context;
+      results = search.results;
+      selected = 0;
+      preview;
+      preview_position;
+      preview_state = default_preview_state;
+    }
+  in
+  sync_preview_state state
 
 let slice list start stop =
   let rec loop index acc = function
@@ -193,25 +221,18 @@ let slice list start stop =
   in
   loop 0 [] list
 
-let render_preview_pane ~terminal_width ~height ~scroll ~selected =
-  Preview.content_for_selection ~max_bytes:Preview.max_preview_bytes selected
-  |> Preview.render_content_lines ~terminal_width ~height ~scroll
+let render_preview_pane ~terminal_width ~height ~scroll content =
+  Preview.render_content_lines ~terminal_width ~height ~scroll content
 
-let selected_candidate_text ~selected results =
-  match fst (selected_result ~selected results) with
-  | None -> None
-  | Some result -> Some result.Matcher.candidate
+let border_line width = if width <= 0 then "" else String.make width '-'
 
-let border_line width =
-  if width <= 0 then "" else String.make width '-'
-
-let render_preview_box ~width ~height ~scroll ~selected =
+let render_preview_box ~width ~height ~scroll content =
   if height <= 0 || width <= 0 then []
   else
     let content_width = max 0 (width - 2) in
     let content =
       render_preview_pane ~terminal_width:content_width ~height:(max 0 (height - 2))
-        ~scroll ~selected
+        ~scroll content
     in
     let pad line =
       let clipped = Text_width.clip ~width:content_width line in
@@ -231,17 +252,50 @@ let render_preview_box ~width ~height ~scroll ~selected =
     if height = 1 then [ Text_width.clip ~width top ]
     else top :: take_fill body_rows [] content @ [ bottom ]
 
-let render_lines ?terminal_width ?(preview = false) ?(preview_position = Preview.Right) ?(preview_scroll = 0) ~terminal_height ~query ~selected results =
+let layout_for_render ~terminal_height ~terminal_width ~preview ~preview_position =
+  match terminal_width with
+  | None -> Preview.disabled terminal_height 0
+  | Some terminal_width ->
+      Preview.compute_layout ~terminal_rows:terminal_height ~terminal_cols:terminal_width
+        ~preview ~position:preview_position
+
+let result_visible_rows ~terminal_height ~terminal_width ~preview ~preview_position =
+  let layout = layout_for_render ~terminal_height ~terminal_width ~preview ~preview_position in
+  if layout.Preview.enabled then layout.results.Preview.rows else result_rows ~terminal_height
+
+let nth_default default index values =
+  let rec loop current = function
+    | [] -> default
+    | value :: _ when current = index -> value
+    | _ :: rest -> loop (current + 1) rest
+  in
+  loop 0 values
+
+let render_result_lines ~result_width ~query ~selected ~start ~stop results =
+  let result_count = List.length results in
+  if result_count = 0 then [ Text_width.clip ~width:result_width (empty_results_message ~query) ]
+  else
+    slice results start stop
+    |> List.map (fun (index, result) ->
+           render_result_line ~terminal_width:result_width ~selected:(index = selected) result)
+
+let render_lines ?terminal_width ?(preview = false) ?(preview_position = Preview.Right)
+    ?(preview_content = Preview.no_selection_content) ?(preview_scroll = 0)
+    ~terminal_height ~query ~selected results =
   if terminal_height <= 0 then []
   else
+    let result_count = List.length results in
+    let selected = clamp_selection ~selected ~result_count in
+    let layout = layout_for_render ~terminal_height ~terminal_width ~preview ~preview_position in
+    let visible_rows =
+      if layout.Preview.enabled then layout.results.Preview.rows else result_rows ~terminal_height
+    in
+    let start, stop = visible_window_for_rows ~selected ~visible_rows ~result_count in
     let clip_line line =
       match terminal_width with
       | None -> line
       | Some terminal_width -> clip_plain ~terminal_width line
     in
-    let result_count = List.length results in
-    let selected = clamp_selection ~selected ~result_count in
-    let start, stop = visible_window ~selected ~terminal_height ~result_count in
     let result_body =
       if result_count = 0 then [ clip_line (empty_results_message ~query) ]
       else
@@ -250,66 +304,40 @@ let render_lines ?terminal_width ?(preview = false) ?(preview_position = Preview
                render_result_line ?terminal_width ~selected:(index = selected) result)
     in
     let body =
-      match terminal_width with
-      | None -> result_body
-      | Some terminal_width ->
-          let layout =
-            Preview.compute_layout ~terminal_rows:terminal_height
-              ~terminal_cols:terminal_width ~preview ~position:preview_position
-          in
-          if not layout.enabled then result_body
-          else
-            match layout.preview with
-            | None -> result_body
-            | Some preview_rect -> (
-                match preview_position with
-                | Preview.Right ->
-                    let result_width = layout.results.Preview.cols in
-                    let preview_lines =
-                      render_preview_box ~width:preview_rect.cols ~height:preview_rect.rows
-                        ~scroll:preview_scroll ~selected:(selected_candidate_text ~selected results)
-                    in
-                    let result_lines =
-                      if result_count = 0 then [ Text_width.clip ~width:result_width (empty_results_message ~query) ]
-                      else
-                        slice results start stop
-                        |> List.map (fun (index, result) ->
-                               render_result_line ~terminal_width:result_width
-                                 ~selected:(index = selected) result)
-                    in
-                    let rows = max (List.length result_lines) (List.length preview_lines) in
-                    let rec nth_default default index values =
-                      match values with
-                      | [] -> default
-                      | value :: _ when index = 0 -> value
-                      | _ :: rest -> nth_default default (index - 1) rest
-                    in
-                    let rec loop index acc =
-                      if index >= rows then List.rev acc
-                      else
-                        let left = nth_default "" index result_lines in
-                        let right = nth_default "" index preview_lines in
-                        let left_width = Text_width.display_width left in
-                        let left_pad = max 0 (result_width - left_width) in
-                        loop (index + 1)
-                          ((left ^ String.make left_pad ' ' ^ " " ^ right) :: acc)
-                    in
-                    loop 0 []
-                | Preview.Bottom ->
-                    let result_width = layout.results.Preview.cols in
-                    let result_lines =
-                      if result_count = 0 then [ Text_width.clip ~width:result_width (empty_results_message ~query) ]
-                      else
-                        slice results start (min stop (start + layout.results.Preview.rows))
-                        |> List.map (fun (index, result) ->
-                               render_result_line ~terminal_width:result_width
-                                 ~selected:(index = selected) result)
-                    in
-                    let preview_lines =
-                      render_preview_box ~width:preview_rect.cols ~height:preview_rect.rows
-                        ~scroll:preview_scroll ~selected:(selected_candidate_text ~selected results)
-                    in
-                    result_lines @ preview_lines)
+      match (terminal_width, layout.Preview.enabled, layout.preview) with
+      | Some _terminal_width, true, Some preview_rect -> (
+          match preview_position with
+          | Preview.Right ->
+              let result_width = layout.results.Preview.cols in
+              let preview_lines =
+                render_preview_box ~width:preview_rect.Preview.cols
+                  ~height:preview_rect.rows ~scroll:preview_scroll preview_content
+              in
+              let result_lines =
+                render_result_lines ~result_width ~query ~selected ~start ~stop results
+              in
+              let rows = max (List.length result_lines) (List.length preview_lines) in
+              let rec loop index acc =
+                if index >= rows then List.rev acc
+                else
+                  let left = nth_default "" index result_lines in
+                  let right = nth_default "" index preview_lines in
+                  let left_width = Text_width.display_width_ansi left in
+                  let left_pad = max 0 (result_width - left_width) in
+                  loop (index + 1) ((left ^ String.make left_pad ' ' ^ " " ^ right) :: acc)
+              in
+              loop 0 []
+          | Preview.Bottom ->
+              let result_width = layout.results.Preview.cols in
+              let result_lines =
+                render_result_lines ~result_width ~query ~selected ~start ~stop results
+              in
+              let preview_lines =
+                render_preview_box ~width:preview_rect.Preview.cols
+                  ~height:preview_rect.rows ~scroll:preview_scroll preview_content
+              in
+              result_lines @ preview_lines)
+      | _ -> result_body
     in
     let prompt_line =
       match terminal_width with
@@ -317,11 +345,7 @@ let render_lines ?terminal_width ?(preview = false) ?(preview_position = Preview
       | Some terminal_width ->
           (render_prompt ~cursor_byte:(String.length query) ~terminal_width ~query).Text_width.visible
     in
-    let lines =
-      prompt_line
-      :: clip_line (format_status ~preview ~result_count ~selected)
-      :: body
-    in
+    let lines = prompt_line :: clip_line (format_status ~preview ~result_count ~selected) :: body in
     let rec take remaining acc = function
       | _ when remaining <= 0 -> List.rev acc
       | [] -> List.rev acc
@@ -342,7 +366,7 @@ let render handle state =
   Terminal.move_cursor handle ~row:1 ~col:1;
   render_lines ~terminal_height:terminal_size.rows ~terminal_width:terminal_size.cols
     ~preview:state.preview ~preview_position:state.preview_position
-    ~preview_scroll:state.preview_scroll
+    ~preview_content:state.preview_state.content ~preview_scroll:state.preview_state.scroll
     ~query:state.query ~selected:state.selected state.results
   |> List.iter (render_line handle);
   Terminal.move_cursor handle ~row:1 ~col:(prompt.cursor_col + 1)
@@ -365,73 +389,69 @@ let preview_visible_rows ~terminal_height ~terminal_width ~preview ~preview_posi
   | None -> 0
   | Some rect -> max 0 (rect.Preview.rows - 3)
 
-let clamp_state_preview_scroll state =
-  let size = Terminal.terminal_size () in
-  let visible_rows =
-    preview_visible_rows ~terminal_height:size.rows ~terminal_width:size.cols
-      ~preview:state.preview ~preview_position:state.preview_position
-  in
-  let content =
-    Preview.content_for_selection ~max_bytes:Preview.max_preview_bytes
-      (selected_candidate_text ~selected:state.selected state.results)
-  in
-  let line_count = Preview.content_line_count content in
-  Preview.clamp_scroll ~scroll:state.preview_scroll ~line_count ~visible_rows
+let clamp_preview_state_scroll ~visible_rows preview_state =
+  let line_count = Preview.content_line_count preview_state.content in
+  {
+    preview_state with
+    scroll = Preview.clamp_scroll ~scroll:preview_state.scroll ~line_count ~visible_rows;
+  }
 
-let apply_preview_scroll_key key state =
-  let size = Terminal.terminal_size () in
-  let visible_rows =
-    preview_visible_rows ~terminal_height:size.rows ~terminal_width:size.cols
-      ~preview:state.preview ~preview_position:state.preview_position
-  in
+let clamp_state_preview_scroll ~visible_rows state =
+  { state with preview_state = clamp_preview_state_scroll ~visible_rows state.preview_state }
+
+let apply_preview_scroll_key ~visible_rows key state =
   match preview_scroll_delta ~visible_rows key with
   | None -> None
   | Some delta ->
-      let content =
-        Preview.content_for_selection ~max_bytes:Preview.max_preview_bytes
-          (selected_candidate_text ~selected:state.selected state.results)
+      let line_count = Preview.content_line_count state.preview_state.content in
+      let scroll =
+        Preview.scroll_by ~scroll:state.preview_state.scroll ~delta ~line_count ~visible_rows
       in
-      let line_count = Preview.content_line_count content in
-      let preview_scroll =
-        Preview.scroll_by ~scroll:state.preview_scroll ~delta ~line_count ~visible_rows
-      in
-      Some { state with preview_scroll }
+      Some { state with preview_state = { state.preview_state with scroll } }
 
-let run_loop handle ~preview:handle_preview ~preview_position:handle_preview_position ~initial_query:handle_initial_query candidates =
+let update_selection selected state =
+  let state = { state with selected } in
+  sync_preview_state state
+
+let page_size_for_selection ~terminal_height ~terminal_width state =
+  max 1
+    (result_visible_rows ~terminal_height ~terminal_width:(Some terminal_width)
+       ~preview:state.preview ~preview_position:state.preview_position)
+
+let run_loop handle ~preview:handle_preview ~preview_position:handle_preview_position
+    ~initial_query:handle_initial_query candidates =
   let rec loop state =
     render handle state;
+    let size = Terminal.terminal_size () in
+    let visible_preview_rows =
+      preview_visible_rows ~terminal_height:size.rows ~terminal_width:size.cols
+        ~preview:state.preview ~preview_position:state.preview_position
+    in
     match Terminal.read_key handle with
     | Terminal.Ctrl_c -> (None, 130)
     | Terminal.Escape -> (None, 1)
     | Terminal.Enter -> selected_result ~selected:state.selected state.results
     | key when state.preview -> (
-        match apply_preview_scroll_key key state with
+        match apply_preview_scroll_key ~visible_rows:visible_preview_rows key state with
         | Some state -> loop state
-        | None ->
-            let page_size =
-              let size = Terminal.terminal_size () in
-              max 1 (result_rows ~terminal_height:size.rows)
-            in
-            (match key with
+        | None -> (
+            match key with
             | Terminal.Arrow_up | Terminal.Arrow_down | Terminal.Page_up | Terminal.Page_down ->
+                let page_size = page_size_for_selection ~terminal_height:size.rows ~terminal_width:size.cols state in
                 let selected =
                   apply_key_to_selection ~page_size key ~selected:state.selected
                     ~result_count:(List.length state.results)
                 in
                 let state =
-                  if selected = state.selected then
-                    { state with preview_scroll = clamp_state_preview_scroll state }
-                  else { state with selected; preview_scroll = 0 }
+                  if selected = state.selected then clamp_state_preview_scroll ~visible_rows:visible_preview_rows state
+                  else update_selection selected state
                 in
                 loop state
             | _ ->
                 let query = apply_key_to_query key ~query:state.query in
                 if query = state.query then loop state else loop (recompute candidates state query)))
     | (Terminal.Arrow_up | Terminal.Arrow_down | Terminal.Page_up | Terminal.Page_down) as key ->
-        let page_size =
-          let size = Terminal.terminal_size () in
-          max 1 (result_rows ~terminal_height:size.rows)
-        in
+        let page_size = page_size_for_selection ~terminal_height:size.rows ~terminal_width:size.cols state in
         let selected =
           apply_key_to_selection ~page_size key ~selected:state.selected
             ~result_count:(List.length state.results)
@@ -441,7 +461,8 @@ let run_loop handle ~preview:handle_preview ~preview_position:handle_preview_pos
         let query = apply_key_to_query key ~query:state.query in
         if query = state.query then loop state else loop (recompute candidates state query)
   in
-  loop (initial_state ~preview:handle_preview ~preview_position:handle_preview_position ~initial_query:handle_initial_query candidates)
+  loop (initial_state ~preview:handle_preview ~preview_position:handle_preview_position
+          ~initial_query:handle_initial_query candidates)
 
 let run ~preview ~preview_position ~initial_query ~candidates =
   if candidates = [] then (

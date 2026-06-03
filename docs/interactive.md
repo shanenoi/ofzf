@@ -7,8 +7,8 @@ and incremental search engine.
 cat input.txt | ofzf
 ```
 
-It remains an MVP: no preview window, no multi-select, no mouse support, no
-ncurses, and no shell integration.
+It remains an MVP: preview is synchronous and intentionally limited, with no
+multi-select, no mouse support, no ncurses, and no shell integration.
 
 ## Mode selection
 
@@ -164,17 +164,24 @@ without cutting inside a character where practical.
 
 ## Preview foundation
 
-When `--preview` is enabled, interactive mode asks `Preview.compute_layout` for result and preview bounds. The preview pane updates synchronously when selection or query changes and displays the selected candidate text. If there is no selection, it shows a no-selected-result message.
+When `--preview` is enabled, interactive mode asks `Preview.compute_layout` for
+result and preview bounds before calculating the visible result window. The
+viewport uses the actual result-pane height, so bottom preview does not borrow
+rows from the preview pane and the selected row remains visible after layout is
+applied. If the terminal is too small, preview is hidden and result rendering
+falls back to the normal full-width result window.
 
 Right-side preview is used by default. Bottom preview can be selected with `--preview-position bottom`. Tiny terminals hide preview rather than rendering past bounds.
 
 ## v0.12 preview file content and scrolling
 
-When preview mode is enabled, the interactive loop now asks `Preview` to load a
-content record for the selected candidate. The selected candidate is previewed as
-file content only when it is a readable regular file. Directories, missing
-paths, unreadable paths, binary-looking files, and plain text candidates render
-explicit fallback messages/content.
+When preview mode is enabled, the interactive loop asks `Preview` to load a
+content record when the selected candidate changes. Rendering receives the
+already-loaded content and does not perform filesystem IO while building frame
+lines. The selected candidate is previewed as file content only when it is a
+readable regular file. Directories, missing paths, unreadable paths,
+binary-looking files, and plain text candidates render explicit fallback
+messages/content.
 
 Preview scroll state is separate from result-list selection. Alt-Up/Ctrl-Y and
 Alt-Down/Ctrl-E scroll by one preview line. Ctrl-B and Ctrl-F scroll by one
@@ -185,3 +192,7 @@ selected candidate changes or the query is recomputed.
 Preview rendering remains synchronous and ANSI-only. The current milestone still
 avoids async workers, arbitrary preview commands, shell expansion, and `{}`
 placeholder expansion.
+
+Right-preview row padding uses ANSI-aware width accounting so highlight and
+inverse-video escape sequences do not count as visible columns. Non-interactive
+output remains unchanged.

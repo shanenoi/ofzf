@@ -149,16 +149,17 @@ safely.
 ### Interactive UI
 
 `lib/interactive.ml` owns query editing, selection movement, visible-window
-calculation, display-width clipping, highlighted rendering, and terminal cleanup. It
+calculation, display-width clipping, highlighted rendering, preview state, and terminal cleanup. It
 uses the existing incremental search engine whenever the query changes, then
 renders only the visible result window. Normal rows highlight matched characters
 from matcher positions; the selected row combines inverse video with
 matched-character highlighting so both selection and relevance remain visible.
 
-When `--preview` is enabled, `Interactive` asks `Preview` for a layout and for
-content associated with the selected candidate. Preview scroll state is kept
-separate from result selection, resets when selection/query changes, and is
-clamped to the loaded content bounds.
+When `--preview` is enabled, `Interactive` asks `Preview` for a layout before it
+calculates the result viewport. Preview content is loaded during state updates,
+not during frame rendering. Preview scroll state is kept separate from result
+selection, resets when the selected candidate changes, and is clamped to the
+loaded content bounds.
 
 ### Preview library
 
@@ -168,6 +169,10 @@ does not execute commands, invoke a shell, or expand placeholders. Regular files
 are read synchronously up to a conservative 256 KiB limit. Directories, missing
 paths, unreadable paths, binary-looking files, and plain-text candidates all
 produce explicit preview content records for the renderer.
+
+CLI option validation lives in `Cli` and is order-independent. Preview is an
+interactive-only feature, so preview flags are rejected with `--bench` and
+`--limit`.
 
 ## Ranking behavior
 

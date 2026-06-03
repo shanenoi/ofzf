@@ -48,6 +48,10 @@ Implemented through v0.12 Preview File Content + Preview Scrolling:
 - Optional interactive preview foundation with right-side or bottom layouts.
 - `--preview` previews readable regular files, or falls back to selected
   candidate text for non-path candidates, without executing commands.
+- Preview CLI validation is deterministic: preview is rejected with `--bench`,
+  `--limit`, or a standalone `--preview-position`.
+- Preview content is loaded only when the selected candidate changes; rendering
+  consumes already-loaded content and uses ANSI-aware width accounting.
 - Preview panes classify directories, missing paths, unreadable files, and
   binary-looking files with clear messages.
 - Preview scrolling supports Alt-Up/Alt-Down, Ctrl-Y/Ctrl-E, and Ctrl-B/Ctrl-F.

@@ -15,7 +15,10 @@ ofzf --preview --preview-position bottom QUERY
 ```
 
 `--preview-position` accepts `right` or `bottom`. Invalid values fail before
-interactive mode starts. Existing non-preview modes remain unchanged.
+interactive mode starts. `--preview-position` without `--preview` is rejected,
+as are `--preview --bench` and `--preview --limit N`, because preview mode is an
+interactive UI path and those modes are non-interactive. Existing non-preview
+modes remain unchanged, including `--bench --limit N QUERY`.
 
 ## Layout model
 
@@ -31,7 +34,9 @@ rectangles from terminal rows and columns. The layout supports:
 
 Right preview splits columns between results and preview. Bottom preview keeps
 full width and allocates lower rows to preview. Both leave the prompt and status
-lines stable at the top.
+lines stable at the top. The interactive renderer computes this layout before
+calculating the result-list viewport, then uses the actual result-pane rows to
+keep the selected row visible.
 
 ## Content source
 
@@ -55,6 +60,11 @@ rows still use matcher positions for highlighting. Preview content uses
 `Text_width` clipping, so long candidate text is clipped by terminal display
 columns rather than bytes.
 
+Preview file loading is not part of frame rendering. The interactive state keeps
+the currently selected candidate, loaded `Preview.content`, and scroll offset.
+Content is reloaded only when the selected candidate changes; scroll is clamped
+against the already-loaded content.
+
 The current preview pane renders a small border where practical, a status/title
 line, and clipped preview lines. If no result is selected, it shows a helpful
 empty-preview message. Preview lines use `Text_width` clipping, so long Unicode
@@ -77,7 +87,7 @@ Page Up and Page Down remain result-list navigation keys.
 
 ## Why commands are not executed yet
 
-Command-based previews are useful but security-sensitive. v0.11 intentionally
+Command-based previews are useful but security-sensitive. The current preview path intentionally
 avoids shell execution, placeholder expansion, and arbitrary command strings.
 This gives the project a tested layout and rendering foundation before adding a
 controlled command model in a later milestone.

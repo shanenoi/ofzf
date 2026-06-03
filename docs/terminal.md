@@ -119,6 +119,11 @@ composition logic lives in `Interactive`.
 
 Preview rendering uses the same ANSI-only terminal approach as the result list. The terminal layer provides primitives; `Interactive` and `Preview` decide layout, borders, clipping, and selected-candidate content. No ncurses or external UI dependency is introduced.
 
+Right-preview composition uses ANSI-aware display width accounting. Highlight
+and inverse-video escape sequences are ignored when padding the result pane, so
+styled rows still align with the preview border. Terminal itself only exposes
+style fragments; width policy remains in `Text_width`.
+
 ## Preview scrolling keys
 
 The terminal parser recognizes the preview-scroll controls used by interactive

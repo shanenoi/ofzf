@@ -19,10 +19,10 @@ zero result rows rather than writing past the terminal bottom.
 ## Row clipping strategy
 
 Interactive result rows are clipped to the detected terminal width before they
-are written. The clipping is byte-based, matching the current matcher position
-API. ANSI style bytes are emitted only around visible candidate bytes, so hidden
-characters do not receive highlight sequences and long candidates cannot push the
-layout horizontally as badly.
+are written. Current rendering clips by display width through `Text_width` while
+still mapping byte-based matcher positions onto decoded cells. ANSI style bytes
+are emitted only around visible cells, so hidden characters do not receive
+highlight sequences and long candidates cannot push the layout horizontally.
 
 Prompt and status rows are also clipped. Non-interactive CLI output is unchanged
 and never receives ANSI styling or truncation.
@@ -76,7 +76,7 @@ result range:
 ## Current limitations
 
 - Resize is detected on redraw rather than via SIGWINCH.
-- Clipping is byte-based, not grapheme-width-aware.
+- Clipping is display-width-aware but still approximate, not full grapheme-cluster aware.
 - Long ANSI-highlighted rows are clipped before writing, but candidate control
   characters are not escaped yet.
 - No preview windows, multi-select, mouse support, async indexing, background

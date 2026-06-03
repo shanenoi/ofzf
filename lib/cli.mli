@@ -23,6 +23,9 @@ type error =
   | Negative_limit of int
   | Invalid_preview_position of string
   | Missing_preview_position
+  | Preview_position_without_preview
+  | Preview_conflicts_with_bench
+  | Preview_conflicts_with_limit
 (** User-facing parse errors. *)
 
 val parse : string array -> (config, error) result
@@ -34,7 +37,10 @@ val parse : string array -> (config, error) result
     - [ofzf --bench QUERY]
     - [ofzf --bench --limit N QUERY]
     - [ofzf --preview [QUERY]]
-    - [ofzf --preview --preview-position right|bottom [QUERY]] *)
+    - [ofzf --preview --preview-position right|bottom [QUERY]]
+
+    Preview mode is intentionally rejected when combined with [--bench] or
+    [--limit]. [--preview-position] is valid only with [--preview]. *)
 
 val usage : string -> string
 (** Usage text for the executable name. *)
