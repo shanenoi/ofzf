@@ -1,26 +1,22 @@
-(** Query result cache for incremental fuzzy search. *)
+(** Query-result cache for incremental search. *)
 
 type 'a entry = {
   query : string;
   results : 'a list;
 }
-(** Cached result subset for one exact query. *)
 
 type 'a t
-(** Cache keyed by exact query text. *)
 
+val default_max_entries : int
+val create : ?max_entries:int -> unit -> 'a t
 val empty : 'a t
-(** Empty cache. *)
+val entries : 'a t -> 'a entry list
+val max_entries : 'a t -> int
 
 val add : query:string -> results:'a list -> 'a t -> 'a t
-(** Store or replace the result subset for [query]. *)
+(** Add or replace a query. The cache evicts oldest entries deterministically
+    once [max_entries] is exceeded. [max_entries <= 0] keeps no entries. *)
 
 val find : query:string -> 'a t -> 'a list option
-(** Exact query lookup. *)
-
 val is_prefix : prefix:string -> query:string -> bool
-(** [is_prefix ~prefix ~query] is true when [query] extends [prefix]. *)
-
 val longest_prefix : query:string -> 'a t -> 'a entry option
-(** Return the cached entry with the longest query that is a prefix of [query].
-    Exact matches are included. *)

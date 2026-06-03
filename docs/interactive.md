@@ -35,8 +35,11 @@ does not contaminate stdout.
 
 ## Query editing
 
-The query starts empty. Printable character keys append one byte to the query.
-Backspace removes one byte and is safe on an empty query. Every query edit runs
+The query starts empty. Printable character keys append to the query through
+`Query_edit`, Backspace is safe on an empty query, Ctrl-U clears, and Ctrl-W
+deletes the previous whitespace-delimited word. The current UI path remains
+append-oriented for compatibility, while `Query_edit` exposes cursor-aware pure
+helpers for future in-query editing. Every query edit runs
 `Search_engine.incremental_search`:
 
 ```text
@@ -52,17 +55,18 @@ the next search space.
 
 ## Selection movement
 
-Arrow Up and Arrow Down move the selected row. Movement is clamped so selection
-never goes below zero or beyond the final result.
+Arrow Up and Arrow Down move the selected row. Page Up and Page Down move by one
+visible result page. `Selection` clamps movement so selection never goes below
+zero or beyond the final result.
 
-When the query changes, selection keeps the same index when the new result set is
-large enough. If the result count shrinks below the old selection, the selected
-index clamps to the final available row. This avoids surprising jumps while also
-preventing stale selection indexes.
+When the query changes, `Selection` preserves the previously selected candidate
+when it still exists in the new result set. Otherwise it clamps the previous
+index into the new range. This avoids surprising jumps while also preventing
+stale selection indexes.
 
 ## Render loop
 
-Each loop iteration:
+Each loop iteration detects terminal size once, then:
 
 1. moves the cursor to the top-left;
 2. clears the terminal;
@@ -80,6 +84,10 @@ Correctness is favored over minimal redraw in this version, so the whole visible
 UI is redrawn after each key. Redraws clear stale content when the result count
 shrinks and the pure renderer caps output to the detected terminal height,
 including very small terminal heights.
+
+`Render` owns frame generation and performs no filesystem IO. Preview content is
+loaded by `Preview_state` when selection changes, then passed into render helpers
+as data.
 
 When no results are available, the result area shows a helpful empty-results
 message instead of leaving stale rows visible.
@@ -135,17 +143,17 @@ in memory because every keystroke may run another search. Memory is therefore
 `O(n)` in the number and size of candidates, plus cache entries maintained by
 the search context.
 
-This is acceptable for v0.8 because the goal is UI correctness and integration
-with the incremental engine. Future versions can add candidate metadata caches,
-cache eviction, and background indexing.
+Query-cache growth is bounded by default, but interactive mode still retains the
+candidate list itself. Future versions can add candidate metadata caches,
+candidate IDs, and background indexing.
 
 ## Current limitations
 
-- No preview window.
+- Preview is synchronous and file/text-only; command-based preview is deferred.
 - No multi-select.
 - No mouse support.
 - Resize handling is redraw-driven rather than signal-driven.
-- Query editing is byte-based rather than grapheme-aware.
+- Query editing is byte/cell-boundary based rather than fully grapheme-aware.
 - Highlighting is byte-position-based, matching the current matcher API.
 
 ## Unicode and display width

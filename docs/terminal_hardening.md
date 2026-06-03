@@ -79,8 +79,9 @@ result range:
 - Clipping is display-width-aware but still approximate, not full grapheme-cluster aware.
 - Long ANSI-highlighted rows are clipped before writing, but candidate control
   characters are not escaped yet.
-- No preview windows, multi-select, mouse support, async indexing, background
-  workers, or shell integration.
+- Preview is synchronous and file/text-only. Multi-select, mouse support, async
+  indexing, background workers, shell integration, and command preview remain
+  deferred.
 
 ## v0.10 width hardening
 

@@ -80,10 +80,10 @@ implementation while preserving the public helper API.
 
 Preview content uses the same width-aware clipping helpers as result rows and prompts. This keeps long selected candidates from overflowing the preview pane and avoids cutting inside decoded UTF-8 cells where practical.
 
-Styled result rows use `Text_width.display_width_ansi` when layout code must
-measure already-rendered strings. That helper strips simple CSI ANSI sequences
-before measuring, so inverse-video and match-highlight escapes do not count as
-visible columns.
+Styled result rows use `Text_width.display_width_ansi` when `Render` must measure
+already-rendered strings, such as padding the result pane next to a right-side
+preview. That helper strips simple CSI ANSI sequences before measuring, so
+inverse-video and match-highlight escapes do not count as visible columns.
 
 ## File-preview interaction
 

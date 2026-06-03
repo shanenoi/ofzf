@@ -22,6 +22,11 @@ type search_result = {
   stats : stats;
 }
 
+type matched_candidate = {
+  result : Matcher.match_result;
+  original_index : int;
+}
+
 let zero_stats = {
   candidate_count_scanned = 0;
   candidates_matched = 0;
@@ -58,23 +63,43 @@ let add_stats base delta = {
   ranking_time = delta.ranking_time;
 }
 
-let rank_matches ?limit ~query matches =
-  match limit with
-  | Some k -> Matcher.rank_top ~query ~k matches
-  | None -> Matcher.rank ~query matches
+let match_source ~query source =
+  source
+  |> List.mapi (fun original_index candidate ->
+         match Matcher.match_candidate ~query ~candidate with
+         | None -> None
+         | Some result -> Some { result; original_index })
+  |> List.filter_map Fun.id
 
-let matching_subset ~query candidates =
-  List.fold_left
-    (fun acc candidate ->
-      if Matcher.matches ~query candidate then candidate :: acc else acc)
-    [] candidates
-  |> List.rev
+let subset_of_matched matched =
+  List.map (fun matched -> matched.result.Matcher.candidate) matched
+
+let rank_matched ?limit matched =
+  match limit with
+  | Some k ->
+      matched
+      |> List.map (fun matched ->
+             {
+               Topk.value = matched.result;
+               score = matched.result.Matcher.score;
+               original_index = matched.original_index;
+             })
+      |> Topk.of_list ~k
+      |> List.map (fun item -> item.Topk.value)
+  | None ->
+      matched
+      |> List.stable_sort (fun left right ->
+             match compare right.result.Matcher.score left.result.Matcher.score with
+             | 0 -> compare left.original_index right.original_index
+             | by_score -> by_score)
+      |> List.map (fun matched -> matched.result)
 
 let search_from ~limit ~base_stats ~query ~source ~cache_hits ~cache_misses
     ~incremental_reuse_count =
   let scanned = List.length source in
-  let subset, matching_time = time (fun () -> matching_subset ~query source) in
-  let results, ranking_time = time (fun () -> rank_matches ?limit ~query subset) in
+  let matched, matching_time = time (fun () -> match_source ~query source) in
+  let subset = subset_of_matched matched in
+  let results, ranking_time = time (fun () -> rank_matched ?limit matched) in
   let delta = {
     candidate_count_scanned = scanned;
     candidates_matched = List.length subset;
@@ -106,14 +131,15 @@ let full_search ?limit ~query candidates =
 let incremental_search ?limit ~context ~query candidates =
   match Query_cache.find ~query context.cache with
   | Some subset ->
-      let results, ranking_time = time (fun () -> rank_matches ?limit ~query subset) in
+      let matched, matching_time = time (fun () -> match_source ~query subset) in
+      let results, ranking_time = time (fun () -> rank_matched ?limit matched) in
       let delta = {
         candidate_count_scanned = 0;
         candidates_matched = List.length subset;
         cache_hits = 1;
         cache_misses = 0;
         incremental_reuse_count = 0;
-        matching_time = 0.0;
+        matching_time;
         ranking_time;
       } in
       let stats = add_stats context.stats delta in

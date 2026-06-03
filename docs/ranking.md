@@ -57,6 +57,10 @@ For small UI-oriented or CLI `K`, bounded insertion is simple and effective. A
 future heap can improve large-`K` behavior to `O(k log K)` without changing
 callers.
 
+Technical Debt Pass 2 kept this stable implementation and expanded benchmark
+coverage instead of replacing it. Heap-based Top-K remains the preferred next
+step only after benchmarks show large `K` is a real bottleneck.
+
 ## Streaming CLI tradeoff
 
 The default CLI path cannot print until it has seen all input, because a later
@@ -71,6 +75,9 @@ v0.5 adds `Search_engine` above ranking. The engine can narrow a new query from
 a cached or previous matching subset when the new query extends an older query.
 Ranking correctness does not change: after the smaller search space is matched,
 results still use the same scoring and stable ordering rules as full ranking.
+The search engine now carries scored match records through ranking where
+practical, avoiding duplicate matcher work inside the full/incremental engine
+path.
 
 `--bench QUERY` uses this layer to compare full search against a simulated
 incremental session over the query prefixes. Normal `ofzf QUERY` and

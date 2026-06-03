@@ -77,9 +77,11 @@ The module exposes helpers for:
 - shared style fragments for inverse-video selection and matched-character
   highlighting.
 
-Rendering remains intentionally simple. Higher-level UI state, viewport logic,
-result count formatting, and match-position highlighting belong in
-`Interactive`, not in `Terminal`.
+Rendering remains intentionally simple. Higher-level UI state belongs in
+`Interactive`; pure viewport logic belongs in `Viewport`; ANSI frame composition
+belongs in `Render`; preview content/scroll state belongs in `Preview_state`.
+`Terminal` stays focused on raw mode, key decoding, size detection, and ANSI
+primitives.
 
 ## Terminal size
 
@@ -88,8 +90,10 @@ Size detection first checks `LINES` and `COLUMNS`, then tries a best-effort
 columns. `normalize_size` is a pure helper used by tests and runtime fallback
 logic to replace invalid dimensions.
 
-Interactive mode asks for size on each redraw. That provides redraw-driven
-resize handling without adding signal handlers or background work.
+Interactive mode detects size once per event/render iteration and passes that
+size through viewport and render helpers. That avoids repeated `stty` calls
+within one frame while preserving redraw-driven resize handling without adding
+signal handlers or background work.
 
 ## Width behavior
 

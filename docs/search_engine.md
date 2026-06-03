@@ -6,8 +6,8 @@ interactive terminal MVP. It sits above `Matcher`, `Scoring`, and `Topk`.
 ```text
 candidate list + query + search_context
   -> choose full input, previous subset, or cached subset
-  -> matcher filters candidates
-  -> rank all results or rank top-k
+  -> matcher produces successful matches with positions and scores
+  -> rank all results or rank top-k from the matched records
   -> updated search_context + statistics
 ```
 
@@ -49,9 +49,11 @@ The engine chooses the search space in this order:
 3. previous query/subset when the previous query is a prefix;
 4. full candidate list fallback.
 
-Exact cache hits skip matching and only rank the cached subset. Prefix reuse
-still performs matching because the longer query may reject some candidates from
-the shorter query.
+Exact cache hits reuse the cached candidate subset and rebuild match records for
+the requested output mode. Prefix reuse still performs matching because the
+longer query may reject some candidates from the shorter query. The internal
+pipeline carries successful `Matcher.match_result` values into ranking so a
+search pass does not separately match once for filtering and again for ranking.
 
 ## Statistics
 
@@ -88,7 +90,7 @@ For full input size `N`, previous matching subset size `P`, final match count
 - exact cache hits scan `O(0)` candidates and re-rank cached matches;
 - full ranking costs `O(m log m)`;
 - top-k ranking costs `O(m * K)` with the current bounded-list implementation;
-- context memory is proportional to cached matching subsets.
+- context memory is proportional to the bounded cached matching subsets.
 
 Incremental search is most valuable when each typed character sharply reduces
 `P`, which is common for file paths and symbol-like candidates.

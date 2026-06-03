@@ -77,11 +77,27 @@ calculation to `Scoring`.
 descending and then by original input index ascending. The CLI uses `Topk.add`
 for `--limit N`, so limited searches do not retain every matching candidate.
 
+### Query editing
+
+`lib/query_edit.ml` owns pure query editing. It supports insert/delete,
+Backspace, Ctrl-U, Ctrl-W, cursor clamping, and cursor movement helpers without
+depending on terminal raw mode or rendering. `Interactive` maps decoded keys to
+query-edit actions and keeps current append-oriented behavior through a wrapper.
+
+### Selection and viewport
+
+`lib/selection.ml` owns selected-index movement, clamping, selected-candidate
+lookup, and selection preservation after result changes. `lib/viewport.ml` owns
+prompt/status header sizing, visible-window calculation, and preview-layout-aware
+result-pane row counts.
+
 ### Query cache
 
 `lib/query_cache.ml` stores matching candidate subsets by query. It supports
-exact query lookup and longest-prefix detection so a future interactive search
-can narrow from prior results when the user extends the query.
+exact query lookup and longest-prefix detection so an interactive search can
+narrow from prior results when the user extends the query. The cache has a
+documented bounded default and deterministic oldest-entry eviction to prevent
+unbounded growth in long sessions.
 
 ### Search engine
 
@@ -146,20 +162,32 @@ positions onto decoded text cells before adding ANSI highlight sequences, so
 ASCII matching behavior remains unchanged while non-ASCII candidates render
 safely.
 
+### Rendering
+
+`lib/render.ml` owns pure ANSI frame rendering. It consumes already-loaded
+preview content, terminal dimensions, query/result state, and layout decisions.
+It performs no filesystem IO and keeps ANSI concerns out of matcher/search code.
+
+### Preview state
+
+`lib/preview_state.ml` owns the selected preview candidate, loaded
+`Preview.content`, and preview scroll offset. It reloads preview content only
+when the selected candidate changes, then clamps scroll against the loaded
+content.
+
 ### Interactive UI
 
-`lib/interactive.ml` owns query editing, selection movement, visible-window
-calculation, display-width clipping, highlighted rendering, preview state, and terminal cleanup. It
+`lib/interactive.ml` now primarily owns terminal setup/restore, alternate-screen
+lifecycle, the event loop, and state transitions. It delegates query editing,
+selection, viewport math, rendering, and preview state to focused modules. It
 uses the existing incremental search engine whenever the query changes, then
-renders only the visible result window. Normal rows highlight matched characters
-from matcher positions; the selected row combines inverse video with
-matched-character highlighting so both selection and relevance remain visible.
+renders only the visible result window.
 
-When `--preview` is enabled, `Interactive` asks `Preview` for a layout before it
-calculates the result viewport. Preview content is loaded during state updates,
-not during frame rendering. Preview scroll state is kept separate from result
-selection, resets when the selected candidate changes, and is clamped to the
-loaded content bounds.
+When `--preview` is enabled, the viewport uses the preview-adjusted result-pane
+height before selecting visible rows. Preview content is loaded during state
+updates, not during frame rendering. Preview scroll state is kept separate from
+result selection, resets when the selected candidate changes, and is clamped to
+the loaded content bounds.
 
 ### Preview library
 
@@ -214,7 +242,7 @@ terminal width where practical.
 The architecture leaves room for fzf-style speed improvements:
 
 1. Replace list positions with arrays or reusable buffers on hot paths.
-2. Add cache eviction and candidate IDs for lower incremental memory overhead.
+2. Add candidate IDs for lower incremental memory overhead.
 3. Cache normalized candidate metadata in future interactive sessions.
 4. Upgrade top-k from bounded insertion list to a binary heap for large `K`.
 5. Add early bailouts when a candidate cannot beat the top-k threshold.

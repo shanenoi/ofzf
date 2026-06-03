@@ -24,6 +24,9 @@ type breakdown = {
   total : int;
 }
 
+let make_candidate_match ~candidate ~positions ~original_index =
+  ({ candidate; positions; original_index } : candidate_match)
+
 let is_ascii_lower = function 'a' .. 'z' -> true | _ -> false
 let is_ascii_upper = function 'A' .. 'Z' -> true | _ -> false
 
@@ -142,7 +145,10 @@ let score_breakdown ~query ~candidate ~positions =
 let score ~query ~candidate ~positions =
   (score_breakdown ~query ~candidate ~positions).total
 
-let score_match ~query ({ candidate; positions; original_index } : candidate_match) =
+let score_match ~query (matched : candidate_match) =
+  let candidate = matched.candidate in
+  let positions = matched.positions in
+  let original_index = matched.original_index in
   let score = score ~query ~candidate ~positions in
   {
     candidate;

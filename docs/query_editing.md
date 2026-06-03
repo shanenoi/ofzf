@@ -1,41 +1,24 @@
 # Query Editing
 
-Interactive query editing is deliberately small and dependency-free. The current
-editing model is append-oriented with byte-level Backspace, Ctrl-U to clear the
-query, and Ctrl-W to delete the previous whitespace-delimited word.
+`lib/query_edit.ml` owns pure query editing. It has no terminal raw-mode or
+rendering dependency; the interactive loop maps decoded terminal keys to
+`Query_edit.action` values and then applies them to query state.
 
-## Current keys
+The module supports cursor-aware operations even though the current interactive
+path remains append-oriented for backward compatibility:
 
-| Key | Behavior |
-| --- | --- |
-| Printable byte | Append to the query |
-| Backspace | Delete one byte before the end of the query |
-| Ctrl-U | Clear the full query |
-| Ctrl-W | Delete the previous whitespace-delimited word |
-| Escape | Cancel interactive mode |
-| Ctrl-C | Cancel interactive mode |
-| Enter | Print the selected result, or exit non-zero when no result exists |
+- printable character insertion;
+- Backspace before the cursor;
+- Delete at the cursor;
+- Ctrl-U clear;
+- Ctrl-W delete previous whitespace-delimited word;
+- cursor clamping and left/right/start/end movement helpers.
 
-Every query edit runs through `Search_engine.incremental_search`, so prefix
-searches can reuse previous candidate subsets.
+Cursor positions are byte offsets. Helpers clamp to UTF-8 byte boundaries where
+practical so editing avoids splitting decoded cells for common UTF-8 input. This
+is still not a complete grapheme-aware editor; full Unicode query editing remains
+deferred.
 
-## Width-aware prompt rendering
-
-Even though the editing model is byte-oriented, prompt rendering is now display
-width-aware. Long queries are clipped by terminal columns rather than bytes, and
-UTF-8 text is decoded safely before rendering. The prompt helper keeps the
-cursor-side portion of the query visible where practical.
-
-## Limitations
-
-- There is no mid-query cursor editing yet in this applied source line.
-- Backspace and Ctrl-W are byte/string helpers, not grapheme-cluster operations.
-- Invalid UTF-8 in input is rendered safely, but raw input parsing is still
-  byte-oriented.
-
-Future navigation polish can add left/right cursor movement, Delete, Home/End,
-Page Up/Page Down, and grapheme-aware editing on top of the text-width helpers.
-
-## Preview interaction
-
-Query editing behavior is unchanged when preview is enabled. Each query edit recomputes results through the search engine, clamps selection, and refreshes the preview pane from the selected candidate.
+`Interactive.apply_key_to_query` is now a compatibility wrapper over
+`Query_edit.apply_append_action`, so existing append/backspace behavior remains
+unchanged while tests can exercise the lower-level cursor-aware helpers directly.

@@ -52,6 +52,12 @@ Implemented through v0.12 Preview File Content + Preview Scrolling:
   `--limit`, or a standalone `--preview-position`.
 - Preview content is loaded only when the selected candidate changes; rendering
   consumes already-loaded content and uses ANSI-aware width accounting.
+- Interactive internals are split into smaller pure modules: `Query_edit`,
+  `Selection`, `Viewport`, `Render`, and `Preview_state`.
+- Query cache growth is bounded by a documented default to avoid unbounded
+  incremental-session memory growth.
+- The search-engine path carries successful matches through ranking so it avoids
+  matching once for filtering and again for ranking where practical.
 - Preview panes classify directories, missing paths, unreadable files, and
   binary-looking files with clear messages.
 - Preview scrolling supports Alt-Up/Alt-Down, Ctrl-Y/Ctrl-E, and Ctrl-B/Ctrl-F.
@@ -121,6 +127,10 @@ as a command.
 ```sh
 make test
 ```
+
+The test suite is split by module responsibility. `Interactive` keeps terminal
+lifecycle and event-loop wiring, while pure behavior lives in focused modules
+that can be tested without a real TTY.
 
 ## Benchmark
 

@@ -1,8 +1,9 @@
 # Query Cache
 
 `Query_cache` stores previously computed matching candidate subsets by exact
-query text. It is intentionally small and dependency-free so a future terminal UI
-can reuse it while a user types.
+query text. It is intentionally small, bounded, and dependency-free so
+interactive search can reuse it while a user types without unbounded memory
+growth.
 
 ## Exact lookup
 
@@ -36,11 +37,12 @@ Each cached entry stores:
 - the query string;
 - the matching candidate strings for that query.
 
-This uses more memory than a stateless search, but it prepares the core for a
-future interactive loop where each additional typed character should narrow a
-previous result set instead of rescanning all input. The current implementation
-keeps the API simple; future versions can add an eviction policy or candidate
-IDs to reduce retained string references.
+This uses more memory than a stateless search, but it lets each additional typed
+character narrow a previous result set instead of rescanning all input. The
+current implementation uses a safe default maximum entry count of 64. Adding a
+new query moves that query to the front and evicts the oldest entries once the
+bound is exceeded. A cache with `max_entries = 0` keeps no entries. Future
+versions can add candidate IDs to reduce retained string references further.
 
 ## Complexity
 
@@ -48,7 +50,7 @@ For `c` cached queries and query length `q`:
 
 - exact lookup is `O(c)` with the current association-list representation;
 - longest-prefix lookup is `O(c * q)`;
-- adding or replacing an entry is `O(c)`.
+- adding or replacing an entry is `O(c)` plus trimming to the configured bound.
 
 This is acceptable for the current milestone because interactive typing usually
 creates a small number of cached prefixes. A future hash table plus prefix index

@@ -132,6 +132,13 @@ Both paths use the same ordering:
 Therefore, `ofzf --limit K QUERY` returns the same ordered prefix as full ranking
 for the same query and input.
 
+## Query cache memory behavior
+
+Interactive and benchmark paths use `Query_cache` through `Search_engine`. The
+cache now has a bounded default size and deterministic oldest-entry eviction.
+This keeps long interactive sessions from accumulating unbounded query subsets
+while preserving exact lookup and longest-prefix reuse behavior.
+
 ## Unicode rendering note
 
 Non-interactive CLI output is unchanged: matching lines are printed exactly as

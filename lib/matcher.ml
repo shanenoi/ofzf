@@ -47,7 +47,10 @@ let rank ~query candidates =
          match find_positions ~query ~candidate with
          | None -> None
          | Some positions ->
-             Some Scoring.{ candidate; positions; original_index })
+             let matched =
+               Scoring.make_candidate_match ~candidate ~positions ~original_index
+             in
+             Some matched)
   |> List.filter_map Fun.id
   |> Scoring.rank ~query
   |> List.map result_of_scored
@@ -59,7 +62,10 @@ let rank_top ~query ~k candidates =
          match find_positions ~query ~candidate with
          | None -> None
          | Some positions ->
-             Some Scoring.{ candidate; positions; original_index })
+             let matched =
+               Scoring.make_candidate_match ~candidate ~positions ~original_index
+             in
+             Some matched)
   |> List.filter_map Fun.id
   |> Scoring.rank_top ~query ~k
   |> List.map result_of_scored

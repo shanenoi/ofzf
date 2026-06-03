@@ -7,6 +7,11 @@ type candidate_match = {
   original_index : int;
 }
 
+val make_candidate_match :
+  candidate:string -> positions:int list -> original_index:int -> candidate_match
+  (** Construct a candidate match without exposing record-label disambiguation at
+      call sites. *)
+
 (** A scored match. Higher [score] values rank first. *)
 type scored_match = {
   candidate : string;

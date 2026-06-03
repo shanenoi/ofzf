@@ -65,6 +65,11 @@ the currently selected candidate, loaded `Preview.content`, and scroll offset.
 Content is reloaded only when the selected candidate changes; scroll is clamped
 against the already-loaded content.
 
+Technical Debt Pass 2 moved this ownership into `Preview_state` and moved frame
+composition into `Render`. `Preview` still owns filesystem classification and
+safe content loading; `Preview_state` decides when to call it; `Render` receives
+plain content data and performs no file IO.
+
 The current preview pane renders a small border where practical, a status/title
 line, and clipped preview lines. If no result is selected, it shows a helpful
 empty-preview message. Preview lines use `Text_width` clipping, so long Unicode
@@ -101,3 +106,7 @@ controlled command model in a later milestone.
 - No background workers.
 - No shell integration or placeholder expansion.
 - No multi-select interaction with preview yet.
+
+The current Top-K implementation remains a bounded sorted list. It is stable and
+simple for small `K`, while a heap-based implementation remains future work for
+large limits.
