@@ -1,12 +1,24 @@
 type key =
   | Character of char
   | Backspace
+  | Ctrl_u
+  | Ctrl_w
   | Ctrl_c
   | Enter
   | Escape
   | Arrow_up
   | Arrow_down
   | Unknown of string
+
+type size = { rows : int; cols : int }
+
+let fallback_size = { rows = 20; cols = 80 }
+
+let normalize_size ?(fallback = fallback_size) size =
+  {
+    rows = (if size.rows > 0 then size.rows else fallback.rows);
+    cols = (if size.cols > 0 then size.cols else fallback.cols);
+  }
 
 type handle = {
   fd : Unix.file_descr;
@@ -23,6 +35,8 @@ let selected_end_highlight = "\027[22;24;7m"
 
 let parse_key_sequence = function
   | "\003" -> Ctrl_c
+  | "\021" -> Ctrl_u
+  | "\023" -> Ctrl_w
   | "\r" | "\n" -> Enter
   | "\b" | "\127" -> Backspace
   | "\027" -> Escape
@@ -106,17 +120,31 @@ let read_char_with_timeout fd timeout =
   | ready, _, _ when ready <> [] -> read_char fd
   | _ -> None
 
+let is_csi_final_byte char = Char.code char >= 0x40 && Char.code char <= 0x7e
+
+let read_escape_sequence fd =
+  match read_char_with_timeout fd 0.03 with
+  | None -> "\027"
+  | Some first ->
+      let buffer = Buffer.create 8 in
+      Buffer.add_char buffer '\027';
+      Buffer.add_char buffer first;
+      (if first = '[' then
+        let rec loop remaining =
+          if remaining > 0 then
+            match read_char_with_timeout fd 0.03 with
+            | Some char ->
+                Buffer.add_char buffer char;
+                if not (is_csi_final_byte char) then loop (remaining - 1)
+            | None -> ()
+        in
+         loop 16);
+      Buffer.contents buffer
+
 let read_key handle =
   match read_char handle.fd with
   | None -> Escape
-  | Some '\027' -> (
-      match read_char_with_timeout handle.fd 0.03 with
-      | None -> Escape
-      | Some '[' -> (
-          match read_char_with_timeout handle.fd 0.03 with
-          | Some suffix -> parse_key_sequence (String.of_seq (List.to_seq [ '\027'; '['; suffix ]))
-          | None -> Unknown "\027[")
-      | Some other -> Unknown (String.of_seq (List.to_seq [ '\027'; other ])))
+  | Some '\027' -> parse_key_sequence (read_escape_sequence handle.fd)
   | Some char -> parse_key_sequence (String.make 1 char)
 
 let int_env name =
@@ -124,20 +152,30 @@ let int_env name =
   | Some value -> int_of_string_opt value
   | None -> None
 
-let height_from_stty () =
+let size_from_stty () =
   try
     let channel = Unix.open_process_in "stty size < /dev/tty 2>/dev/null" in
     let line = input_line channel in
     ignore (Unix.close_process_in channel);
     match String.split_on_char ' ' line with
-    | rows :: _ -> int_of_string_opt rows
+    | rows :: cols :: _ -> (
+        match (int_of_string_opt rows, int_of_string_opt cols) with
+        | Some rows, Some cols -> Some (normalize_size { rows; cols })
+        | _ -> None)
     | _ -> None
   with _ -> None
 
-let terminal_height () =
-  match int_env "LINES" with
-  | Some rows when rows > 0 -> rows
-  | _ -> (
-      match height_from_stty () with
-      | Some rows when rows > 0 -> rows
-      | _ -> 20)
+let terminal_size () =
+  let env_size =
+    match (int_env "LINES", int_env "COLUMNS") with
+    | Some rows, Some cols -> Some (normalize_size { rows; cols })
+    | Some rows, None -> Some (normalize_size { fallback_size with rows })
+    | None, Some cols -> Some (normalize_size { fallback_size with cols })
+    | None, None -> None
+  in
+  match env_size with
+  | Some size -> size
+  | None -> ( match size_from_stty () with Some size -> size | None -> fallback_size )
+
+let terminal_height () = (terminal_size ()).rows
+let terminal_width () = (terminal_size ()).cols

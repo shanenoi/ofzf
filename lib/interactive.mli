@@ -9,6 +9,12 @@ val clamp_selection : selected:int -> result_count:int -> int
 val visible_window : selected:int -> terminal_height:int -> result_count:int -> int * int
 (** Return [(start, stop)] bounds for visible result rows. [stop] is exclusive. *)
 
+val clip_plain : terminal_width:int -> string -> string
+(** Clip a plain, non-ANSI string to the visible terminal width. *)
+
+val delete_previous_word : string -> string
+(** Query-editing helper for Ctrl-W. *)
+
 val apply_key_to_query : Terminal.key -> query:string -> string
 (** Pure query editing helper. Non-editing keys leave the query unchanged. *)
 
@@ -24,10 +30,21 @@ val empty_results_message : query:string -> string
 val render_candidate : selected:bool -> positions:int list -> candidate:string -> string
 (** Render one candidate with ANSI highlighting on matched byte positions. *)
 
-val render_result_line : selected:bool -> Matcher.match_result -> string
+val render_candidate_clipped :
+  terminal_width:int -> selected:bool -> positions:int list -> candidate:string -> string
+(** Render one candidate clipped to terminal width while preserving matched-byte
+    highlighting inside the visible range. *)
+
+val render_result_line : ?terminal_width:int -> selected:bool -> Matcher.match_result -> string
 (** Render one result row, including selected-row styling when requested. *)
 
-val render_lines : terminal_height:int -> query:string -> selected:int -> Matcher.match_result list -> string list
+val render_lines :
+  ?terminal_width:int ->
+  terminal_height:int ->
+  query:string ->
+  selected:int ->
+  Matcher.match_result list ->
+  string list
 (** Pure renderer used by tests. The returned list never contains more lines
     than [terminal_height]. *)
 

@@ -82,6 +82,10 @@ let assert_contains message ~needle value =
   if not (contains_substring ~needle value) then
     failwith (Printf.sprintf "%s: expected %S to contain %S" message value needle)
 
+let assert_not_contains message ~needle value =
+  if contains_substring ~needle value then
+    failwith (Printf.sprintf "%s: expected %S not to contain %S" message value needle)
+
 let score query candidate = (require_match query candidate).score
 
 let () =
@@ -190,6 +194,10 @@ let () =
     (Ofzf.Terminal.parse_key_sequence "\027[B");
   assert_equal_key "parse backspace" Ofzf.Terminal.Backspace
     (Ofzf.Terminal.parse_key_sequence "\127");
+  assert_equal_key "parse ctrl-u" Ofzf.Terminal.Ctrl_u
+    (Ofzf.Terminal.parse_key_sequence "\021");
+  assert_equal_key "parse ctrl-w" Ofzf.Terminal.Ctrl_w
+    (Ofzf.Terminal.parse_key_sequence "\023");
   assert_equal_key "parse ctrl-c" Ofzf.Terminal.Ctrl_c
     (Ofzf.Terminal.parse_key_sequence "\003");
   assert_equal_key "parse enter" Ofzf.Terminal.Enter
@@ -198,6 +206,21 @@ let () =
     (Ofzf.Terminal.parse_key_sequence "\027");
   assert_equal_key "parse character" (Ofzf.Terminal.Character 'a')
     (Ofzf.Terminal.parse_key_sequence "a");
+  assert_equal_key "parse unknown escape sequence" (Ofzf.Terminal.Unknown "\027[Z")
+    (Ofzf.Terminal.parse_key_sequence "\027[Z");
+  assert_equal_key "parse unknown long escape sequence"
+    (Ofzf.Terminal.Unknown "\027[1;5A")
+    (Ofzf.Terminal.parse_key_sequence "\027[1;5A");
+
+  let normalized =
+    Ofzf.Terminal.normalize_size
+      ~fallback:{ Ofzf.Terminal.rows = 24; cols = 100 }
+      { Ofzf.Terminal.rows = 0; cols = -1 }
+  in
+  assert_true "terminal size normalization falls back for bad rows"
+    (normalized.rows = 24);
+  assert_true "terminal size normalization falls back for bad cols"
+    (normalized.cols = 100);
 
   assert_true "interactive result rows leaves room for prompt"
     (Ofzf.Interactive.result_rows ~terminal_height:20 = 18);
@@ -249,6 +272,16 @@ let () =
     (Ofzf.Interactive.visible_window ~selected:7 ~terminal_height:6
        ~result_count:10
     = (4, 8));
+  assert_true "visible window recalculates after tall resize"
+    (Ofzf.Interactive.visible_window ~selected:8 ~terminal_height:10
+       ~result_count:20
+    = (1, 9));
+  assert_true "visible window recalculates after short resize"
+    (Ofzf.Interactive.visible_window ~selected:8 ~terminal_height:4
+       ~result_count:20
+    = (7, 9));
+  assert_true "selection clamps after result shrink"
+    (Ofzf.Interactive.clamp_selection ~selected:5 ~result_count:2 = 1);
   assert_true "visible window handles too-small terminal"
     (Ofzf.Interactive.visible_window ~selected:1 ~terminal_height:1
        ~result_count:3
@@ -262,9 +295,27 @@ let () =
     = "ma");
   assert_true "backspace on empty query is safe"
     (Ofzf.Interactive.apply_key_to_query Ofzf.Terminal.Backspace ~query:"" = "");
+  assert_true "ctrl-u clears query"
+    (Ofzf.Interactive.apply_key_to_query Ofzf.Terminal.Ctrl_u ~query:"matcher"
+    = "");
+  assert_true "ctrl-w deletes previous word"
+    (Ofzf.Interactive.apply_key_to_query Ofzf.Terminal.Ctrl_w
+       ~query:"matcher fuzzy"
+    = "matcher ");
+  assert_true "ctrl-w removes trailing separators and previous word"
+    (Ofzf.Interactive.delete_previous_word "matcher fuzzy   " = "matcher ");
+  assert_true "unknown escape sequence does not edit query"
+    (Ofzf.Interactive.apply_key_to_query (Ofzf.Terminal.Unknown "\027[Z")
+       ~query:"mat"
+    = "mat");
   assert_true "non-editing key keeps query"
     (Ofzf.Interactive.apply_key_to_query Ofzf.Terminal.Arrow_down ~query:"mat"
     = "mat");
+
+  assert_equal_string "plain row clipping uses terminal width" "match"
+    (Ofzf.Interactive.clip_plain ~terminal_width:5 "matcher.ml");
+  assert_equal_string "zero-width clipping returns empty" ""
+    (Ofzf.Interactive.clip_plain ~terminal_width:0 "matcher.ml");
 
   assert_equal_string "status includes count and selection"
     "3 matches · 2/3 selected · ↑/↓ move · Enter select · Esc cancel"
@@ -285,6 +336,14 @@ let () =
     highlighted;
   assert_contains "normal row closes highlight style"
     ~needle:Ofzf.Terminal.end_highlight highlighted;
+  let clipped_highlight =
+    Ofzf.Interactive.render_candidate_clipped ~terminal_width:2 ~selected:false
+      ~positions:highlight_result.positions ~candidate:highlight_result.candidate
+  in
+  assert_contains "clipped highlight preserves visible match style"
+    ~needle:Ofzf.Terminal.highlight clipped_highlight;
+  assert_not_contains "clipped highlight omits hidden text" ~needle:"t"
+    clipped_highlight;
   let selected_line = Ofzf.Interactive.render_result_line ~selected:true highlight_result in
   assert_true "selected row starts inverse"
     (starts_with ~prefix:Ofzf.Terminal.inverse selected_line);
@@ -292,6 +351,14 @@ let () =
     (ends_with ~suffix:Ofzf.Terminal.reset selected_line);
   assert_contains "selected highlight restores inverse"
     ~needle:Ofzf.Terminal.selected_end_highlight selected_line;
+  let clipped_selected_line =
+    Ofzf.Interactive.render_result_line ~terminal_width:3 ~selected:true
+      highlight_result
+  in
+  assert_true "clipped selected row starts inverse"
+    (starts_with ~prefix:Ofzf.Terminal.inverse clipped_selected_line);
+  assert_true "clipped selected row resets styling"
+    (ends_with ~suffix:Ofzf.Terminal.reset clipped_selected_line);
 
   let render_lines =
     Ofzf.Interactive.render_lines ~terminal_height:4 ~query:"mat" ~selected:1
@@ -300,6 +367,12 @@ let () =
   assert_true "render line count respects terminal height" (List.length render_lines = 4);
   assert_contains "render status includes selected index" ~needle:"2/2 selected"
     (List.nth render_lines 1);
+  let clipped_lines =
+    Ofzf.Interactive.render_lines ~terminal_height:3 ~terminal_width:5
+      ~query:"matcher" ~selected:0 [ highlight_result ]
+  in
+  assert_equal_string "prompt is clipped to terminal width" "> mat"
+    (List.hd clipped_lines);
   let empty_lines =
     Ofzf.Interactive.render_lines ~terminal_height:3 ~query:"zzz" ~selected:0 []
   in

@@ -13,7 +13,7 @@ original non-interactive fuzzy-filter behavior.
 
 ## Current status
 
-Implemented through v0.7 interactive highlighting and UI stabilization:
+Implemented through v0.8 terminal interaction hardening:
 
 - Case-insensitive subsequence fuzzy matching.
 - Match positions for future highlighting.
@@ -34,6 +34,12 @@ Implemented through v0.7 interactive highlighting and UI stabilization:
   errors where practical.
 - Stable prompt/status layout with result counts, selected index, empty-result
   messaging, and viewport edge-case handling.
+- Terminal height and width detection with safe fallbacks.
+- Clipped interactive row rendering so long candidates do not break layout.
+- Ctrl-U query clear, Ctrl-W previous-word deletion, and safer unknown escape
+  handling.
+- Selection clamping and viewport recalculation after result shrink or terminal
+  resize checks.
 - CLI entry point that filters stdin using the query argument.
 - Unit tests for matcher, scoring, ranking, top-k, CLI parsing, and pure
   interactive helpers.

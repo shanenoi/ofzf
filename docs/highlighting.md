@@ -24,6 +24,10 @@ whose indexes appear in the position list with the shared terminal highlight
 style. The helper is pure, so highlighting behavior can be unit-tested without a
 real terminal.
 
+`Interactive.render_candidate_clipped` uses the same styling rules but walks
+only the visible byte range for the current terminal width. Match positions that
+fall outside that clipped range are ignored for the current redraw.
+
 ## ANSI styling strategy
 
 ANSI escape sequences stay in terminal/interactive rendering code:
@@ -48,6 +52,14 @@ signals:
 - the row is still visibly selected;
 - the matched characters are still visibly emphasized.
 
+## Clipped rows
+
+Long candidates are clipped before being written to the terminal. Clipping is
+byte-based because matcher positions are currently byte offsets. ANSI escape
+sequences are emitted only around visible bytes, so hidden matched characters do
+not leak styling into the output. Prompt and status rows use plain clipping;
+candidate rows use highlight-aware clipping.
+
 ## Complexity
 
 For candidate length `n` and query length `q`, rendering one highlighted row is
@@ -62,3 +74,4 @@ Future versions can store positions in arrays or a byte mask to make rendering
 - Positions are byte offsets, not grapheme clusters.
 - Control characters in candidates are not specially escaped yet.
 - Highlighting is applied only in interactive mode.
+- Clipping is based on byte count, not terminal cell width.

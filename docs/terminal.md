@@ -49,13 +49,17 @@ Raw key input is byte-oriented. The current MVP decodes:
 - printable character bytes as `Character c`;
 - `\r` and `\n` as Enter;
 - `\b` and DEL as Backspace;
+- Ctrl-U as `Ctrl_u`;
+- Ctrl-W as `Ctrl_w`;
 - Ctrl-C as `Ctrl_c`;
 - bare Escape as `Escape`;
 - `ESC [ A` as Arrow Up;
 - `ESC [ B` as Arrow Down.
 
 Escape sequences are read with a short timeout after the initial Escape byte so
-a plain Escape key can still be recognized.
+a plain Escape key can still be recognized. Unsupported escape sequences become
+`Unknown` key events. The interactive query editor ignores `Unknown`, which
+prevents partial control bytes from corrupting the query.
 
 ## ANSI rendering helpers
 
@@ -75,13 +79,23 @@ result count formatting, and match-position highlighting belong in
 
 ## Terminal size
 
-Height detection first checks the `LINES` environment variable, then tries a
-best-effort `stty size < /dev/tty`. If neither works, the fallback height is 20
-rows. This keeps the MVP usable in constrained environments.
+Size detection first checks `LINES` and `COLUMNS`, then tries a best-effort
+`stty size < /dev/tty`. If neither works, the fallback size is 20 rows by 80
+columns. `normalize_size` is a pure helper used by tests and runtime fallback
+logic to replace invalid dimensions.
+
+Interactive mode asks for size on each redraw. That provides redraw-driven
+resize handling without adding signal handlers or background work.
+
+## Width behavior
+
+Terminal width is used only by interactive rendering. Rows are clipped before
+being written so long paths or candidates cannot badly break the prompt/status
+layout. Non-interactive output is not clipped.
 
 ## Limitations
 
-- No resize-event handling yet.
+- Resize handling is redraw-driven rather than SIGWINCH-driven.
 - No mouse input.
 - No UTF-8-aware editing; Backspace removes one byte.
 - No async input or background indexing.

@@ -5,7 +5,9 @@ type state = {
   selected : int;
 }
 
-let result_rows ~terminal_height = max 0 (terminal_height - 2)
+let header_rows = 2
+
+let result_rows ~terminal_height = max 0 (terminal_height - header_rows)
 
 let clamp_selection ~selected ~result_count =
   if result_count <= 0 then 0 else min (result_count - 1) (max 0 selected)
@@ -20,8 +22,34 @@ let visible_window ~selected ~terminal_height ~result_count =
     let stop = min result_count (start + rows) in
     (start, stop)
 
+let clip_plain ~terminal_width text =
+  if terminal_width <= 0 then ""
+  else if String.length text <= terminal_width then text
+  else String.sub text 0 terminal_width
+
+let is_query_word_separator = function
+  | ' ' | '\t' | '\r' | '\n' -> true
+  | _ -> false
+
+let delete_previous_word query =
+  let rec skip_separators index =
+    if index <= 0 then 0
+    else if is_query_word_separator query.[index - 1] then skip_separators (index - 1)
+    else index
+  in
+  let rec skip_word index =
+    if index <= 0 then 0
+    else if is_query_word_separator query.[index - 1] then index
+    else skip_word (index - 1)
+  in
+  let stop = skip_separators (String.length query) in
+  let start = skip_word stop in
+  String.sub query 0 start
+
 let apply_key_to_query key ~query =
   match key with
+  | Terminal.Ctrl_u -> ""
+  | Terminal.Ctrl_w -> delete_previous_word query
   | Terminal.Backspace ->
       if query = "" then query else String.sub query 0 (String.length query - 1)
   | Terminal.Character char when Char.code char >= 0x20 && Char.code char <> 0x7f ->
@@ -65,9 +93,29 @@ let render_candidate ~selected ~positions ~candidate =
     candidate;
   Buffer.contents buffer
 
-let render_result_line ~selected (result : Matcher.match_result) =
+let render_candidate_clipped ~terminal_width ~selected ~positions ~candidate =
+  if terminal_width <= 0 then ""
+  else
+    let visible = min terminal_width (String.length candidate) in
+    let buffer = Buffer.create (visible + (List.length positions * 16)) in
+    for index = 0 to visible - 1 do
+      let char = candidate.[index] in
+      if is_position positions index then (
+        Buffer.add_string buffer Terminal.highlight;
+        Buffer.add_char buffer char;
+        Buffer.add_string buffer
+          (if selected then Terminal.selected_end_highlight else Terminal.end_highlight))
+      else Buffer.add_char buffer char
+    done;
+    Buffer.contents buffer
+
+let render_result_line ?terminal_width ~selected (result : Matcher.match_result) =
   let rendered =
-    render_candidate ~selected ~positions:result.positions ~candidate:result.candidate
+    match terminal_width with
+    | None -> render_candidate ~selected ~positions:result.positions ~candidate:result.candidate
+    | Some terminal_width ->
+        render_candidate_clipped ~terminal_width ~selected ~positions:result.positions
+          ~candidate:result.candidate
   in
   if selected then Terminal.inverse ^ rendered ^ Terminal.reset else rendered
 
@@ -83,11 +131,12 @@ let recompute candidates state query =
   let search =
     Search_engine.incremental_search ~context:state.context ~query candidates
   in
+  let result_count = List.length search.results in
   {
     query;
     context = search.context;
     results = search.results;
-    selected = clamp_selection ~selected:0 ~result_count:(List.length search.results);
+    selected = clamp_selection ~selected:state.selected ~result_count;
   }
 
 let initial_state candidates =
@@ -111,20 +160,29 @@ let slice list start stop =
   in
   loop 0 [] list
 
-let render_lines ~terminal_height ~query ~selected results =
+let render_lines ?terminal_width ~terminal_height ~query ~selected results =
   if terminal_height <= 0 then []
   else
+    let clip_line line =
+      match terminal_width with
+      | None -> line
+      | Some terminal_width -> clip_plain ~terminal_width line
+    in
     let result_count = List.length results in
     let selected = clamp_selection ~selected ~result_count in
     let start, stop = visible_window ~selected ~terminal_height ~result_count in
     let body =
-      if result_count = 0 then [ empty_results_message ~query ]
+      if result_count = 0 then [ clip_line (empty_results_message ~query) ]
       else
         slice results start stop
         |> List.map (fun (index, result) ->
-               render_result_line ~selected:(index = selected) result)
+               render_result_line ?terminal_width ~selected:(index = selected) result)
     in
-    let lines = ("> " ^ query) :: format_status ~result_count ~selected :: body in
+    let lines =
+      clip_line ("> " ^ query)
+      :: clip_line (format_status ~result_count ~selected)
+      :: body
+    in
     let rec take remaining acc = function
       | _ when remaining <= 0 -> List.rev acc
       | [] -> List.rev acc
@@ -135,12 +193,12 @@ let render_lines ~terminal_height ~query ~selected results =
 let render_line handle line = Terminal.write handle (line ^ "\n")
 
 let render handle state =
-  let terminal_height = Terminal.terminal_height () in
+  let terminal_size = Terminal.terminal_size () in
   Terminal.move_cursor handle ~row:1 ~col:1;
   Terminal.clear_screen handle;
   Terminal.move_cursor handle ~row:1 ~col:1;
-  render_lines ~terminal_height ~query:state.query ~selected:state.selected
-    state.results
+  render_lines ~terminal_height:terminal_size.rows ~terminal_width:terminal_size.cols
+    ~query:state.query ~selected:state.selected state.results
   |> List.iter (render_line handle)
 
 let cleanup handle =

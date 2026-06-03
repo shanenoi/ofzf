@@ -51,15 +51,18 @@ Supported keys:
 
 - printable characters append to the query;
 - Backspace removes one byte from the query;
+- Ctrl-U clears the query;
+- Ctrl-W deletes the previous whitespace-delimited query word;
 - Arrow Up/Down moves the selected row;
 - Enter prints the selected candidate to stdout and exits successfully;
 - Escape exits non-zero;
 - Ctrl-C exits non-zero.
 
-The result window is based on terminal height where practical. If height cannot
-be detected, `ofzf` falls back to a safe default. The UI uses the alternate
-screen, highlights matched characters, shows the match count and selected index,
-and leaves stdout reserved for the selected candidate only.
+The result window is based on terminal height and width where practical. If size
+cannot be detected, `ofzf` falls back to a safe default. The UI uses the
+alternate screen, clips long rows, highlights matched characters, shows the
+match count and selected index, and leaves stdout reserved for the selected
+candidate only.
 
 If Enter is pressed while there are no results, interactive mode exits non-zero
 without printing a selected line. Escape and Ctrl-C also cancel with non-zero

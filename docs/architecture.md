@@ -120,10 +120,11 @@ exists.
 - save and restore the previous terminal mode;
 - enter non-canonical, no-echo raw mode;
 - enter and leave the ANSI alternate-screen buffer;
-- decode character input, Backspace, Ctrl-C, Enter, Escape, and Up/Down arrows;
+- decode character input, Backspace, Ctrl-U, Ctrl-W, Ctrl-C, Enter, Escape,
+  Up/Down arrows, and unknown escape sequences;
 - provide ANSI helpers for clearing the screen, cursor movement, cursor
   visibility, inverse-video selection, and matched-character highlighting;
-- detect terminal height where practical, with a safe fallback.
+- detect terminal height and width where practical, with safe fallbacks;
 
 Using `/dev/tty` lets stdin remain the candidate stream and stdout remain the
 selected result stream.
@@ -131,11 +132,11 @@ selected result stream.
 ### Interactive UI
 
 `lib/interactive.ml` owns query editing, selection movement, visible-window
-calculation, highlighted rendering, and terminal cleanup. It uses the existing
-incremental search engine whenever the query changes, then renders only the
-visible result window. Normal rows highlight matched characters from matcher
-positions; the selected row combines inverse video with matched-character
-highlighting so both selection and relevance remain visible.
+calculation, width clipping, highlighted rendering, and terminal cleanup. It
+uses the existing incremental search engine whenever the query changes, then
+renders only the visible result window. Normal rows highlight matched characters
+from matcher positions; the selected row combines inverse video with
+matched-character highlighting so both selection and relevance remain visible.
 
 ## Ranking behavior
 
@@ -166,8 +167,9 @@ bound to `O(k log K)` while preserving the same public API.
 Interactive mode loads candidates into memory once before entering raw mode, so
 future keystrokes can use the incremental search engine. Rendering cost is
 bounded by the visible terminal rows rather than the total result count. The
-renderer clears stale content on each redraw and caps pure render output to the
-detected terminal height, including very small terminal heights.
+renderer clears stale content on each redraw, caps pure render output to the
+detected terminal height, and clips prompt/status/result rows to the detected
+terminal width where practical.
 
 ## Future optimization plan
 
@@ -179,6 +181,6 @@ The architecture leaves room for fzf-style speed improvements:
 4. Upgrade top-k from bounded insertion list to a binary heap for large `K`.
 5. Add early bailouts when a candidate cannot beat the top-k threshold.
 6. Parallelize scoring across chunks for non-streaming batch use cases.
-7. Improve terminal redraw minimality and handle terminal resize events.
+7. Improve terminal redraw minimality and add signal-driven resize handling.
 8. Cache pre-rendered candidate fragments for large interactive result sets.
 9. Add preview windows and multi-select only after the matching core is stable.

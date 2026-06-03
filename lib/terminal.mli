@@ -7,6 +7,8 @@
 type key =
   | Character of char
   | Backspace
+  | Ctrl_u
+  | Ctrl_w
   | Ctrl_c
   | Enter
   | Escape
@@ -17,6 +19,15 @@ type key =
 
 type handle
 (** Raw-mode terminal handle. *)
+
+type size = { rows : int; cols : int }
+(** Terminal dimensions in rows and columns. *)
+
+val fallback_size : size
+(** Safe terminal dimensions used when detection fails. *)
+
+val normalize_size : ?fallback:size -> size -> size
+(** Pure helper that replaces non-positive dimensions with fallback values. *)
 
 val parse_key_sequence : string -> key
 (** Pure key parser used by tests and by [read_key]. *)
@@ -51,3 +62,9 @@ val read_key : handle -> key
 
 val terminal_height : unit -> int
 (** Best-effort terminal height. Falls back to [20]. *)
+
+val terminal_width : unit -> int
+(** Best-effort terminal width. Falls back to [80]. *)
+
+val terminal_size : unit -> size
+(** Best-effort terminal size. Uses [LINES]/[COLUMNS], then [stty size], then a safe fallback. *)
