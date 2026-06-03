@@ -52,6 +52,36 @@ let assert_cli_error message argv =
 let assert_equal_key message expected actual =
   if expected <> actual then failwith (message ^ ": unexpected key")
 
+let assert_equal_string message expected actual =
+  if expected <> actual then
+    failwith (Printf.sprintf "%s: expected %S, got %S" message expected actual)
+
+let starts_with ~prefix value =
+  let prefix_length = String.length prefix in
+  String.length value >= prefix_length
+  && String.sub value 0 prefix_length = prefix
+
+let ends_with ~suffix value =
+  let suffix_length = String.length suffix in
+  let value_length = String.length value in
+  value_length >= suffix_length
+  && String.sub value (value_length - suffix_length) suffix_length = suffix
+
+let contains_substring ~needle value =
+  let needle_length = String.length needle in
+  let value_length = String.length value in
+  let rec loop index =
+    if needle_length = 0 then true
+    else if index + needle_length > value_length then false
+    else if String.sub value index needle_length = needle then true
+    else loop (index + 1)
+  in
+  loop 0
+
+let assert_contains message ~needle value =
+  if not (contains_substring ~needle value) then
+    failwith (Printf.sprintf "%s: expected %S to contain %S" message value needle)
+
 let score query candidate = (require_match query candidate).score
 
 let () =
@@ -170,9 +200,9 @@ let () =
     (Ofzf.Terminal.parse_key_sequence "a");
 
   assert_true "interactive result rows leaves room for prompt"
-    (Ofzf.Interactive.result_rows ~terminal_height:20 = 17);
-  assert_true "interactive result rows has safe minimum"
-    (Ofzf.Interactive.result_rows ~terminal_height:1 = 1);
+    (Ofzf.Interactive.result_rows ~terminal_height:20 = 18);
+  assert_true "interactive result rows handles tiny terminals"
+    (Ofzf.Interactive.result_rows ~terminal_height:1 = 0);
   assert_true "selection clamps empty result set"
     (Ofzf.Interactive.clamp_selection ~selected:10 ~result_count:0 = 0);
   assert_true "selection clamps high values"
@@ -187,10 +217,42 @@ let () =
     (Ofzf.Interactive.apply_key_to_selection Ofzf.Terminal.Arrow_up ~selected:1
        ~result_count:3
     = 0);
+  assert_true "arrow up at top stays at top"
+    (Ofzf.Interactive.apply_key_to_selection Ofzf.Terminal.Arrow_up ~selected:0
+       ~result_count:3
+    = 0);
+  assert_true "arrow down at bottom stays at bottom"
+    (Ofzf.Interactive.apply_key_to_selection Ofzf.Terminal.Arrow_down
+       ~selected:2 ~result_count:3
+    = 2);
+  assert_true "visible window handles no results"
+    (Ofzf.Interactive.visible_window ~selected:0 ~terminal_height:6
+       ~result_count:0
+    = (0, 0));
+  assert_true "visible window handles one result"
+    (Ofzf.Interactive.visible_window ~selected:0 ~terminal_height:6
+       ~result_count:1
+    = (0, 1));
+  assert_true "visible window keeps top selection visible"
+    (Ofzf.Interactive.visible_window ~selected:0 ~terminal_height:5
+       ~result_count:10
+    = (0, 3));
+  assert_true "visible window keeps bottom selection visible"
+    (Ofzf.Interactive.visible_window ~selected:9 ~terminal_height:5
+       ~result_count:10
+    = (7, 10));
+  assert_true "visible window handles fewer results than rows"
+    (Ofzf.Interactive.visible_window ~selected:1 ~terminal_height:10
+       ~result_count:3
+    = (0, 3));
   assert_true "visible window keeps selected row visible"
     (Ofzf.Interactive.visible_window ~selected:7 ~terminal_height:6
        ~result_count:10
-    = (5, 8));
+    = (4, 8));
+  assert_true "visible window handles too-small terminal"
+    (Ofzf.Interactive.visible_window ~selected:1 ~terminal_height:1
+       ~result_count:3
+    = (0, 0));
   assert_true "character edits query"
     (Ofzf.Interactive.apply_key_to_query (Ofzf.Terminal.Character 'm')
        ~query:""
@@ -198,9 +260,62 @@ let () =
   assert_true "backspace edits query"
     (Ofzf.Interactive.apply_key_to_query Ofzf.Terminal.Backspace ~query:"mat"
     = "ma");
+  assert_true "backspace on empty query is safe"
+    (Ofzf.Interactive.apply_key_to_query Ofzf.Terminal.Backspace ~query:"" = "");
   assert_true "non-editing key keeps query"
     (Ofzf.Interactive.apply_key_to_query Ofzf.Terminal.Arrow_down ~query:"mat"
     = "mat");
+
+  assert_equal_string "status includes count and selection"
+    "3 matches · 2/3 selected · ↑/↓ move · Enter select · Esc cancel"
+    (Ofzf.Interactive.format_status ~result_count:3 ~selected:1);
+  assert_equal_string "status handles no results"
+    "0 matches · no selection · ↑/↓ move · Enter select · Esc cancel"
+    (Ofzf.Interactive.format_status ~result_count:0 ~selected:0);
+  assert_equal_string "empty results message includes query"
+    "(no matches for \"zzz\")"
+    (Ofzf.Interactive.empty_results_message ~query:"zzz");
+
+  let highlight_result = require_match "mat" "matcher.ml" in
+  let highlighted =
+    Ofzf.Interactive.render_candidate ~selected:false
+      ~positions:highlight_result.positions ~candidate:highlight_result.candidate
+  in
+  assert_contains "normal row uses highlight style" ~needle:Ofzf.Terminal.highlight
+    highlighted;
+  assert_contains "normal row closes highlight style"
+    ~needle:Ofzf.Terminal.end_highlight highlighted;
+  let selected_line = Ofzf.Interactive.render_result_line ~selected:true highlight_result in
+  assert_true "selected row starts inverse"
+    (starts_with ~prefix:Ofzf.Terminal.inverse selected_line);
+  assert_true "selected row resets styling"
+    (ends_with ~suffix:Ofzf.Terminal.reset selected_line);
+  assert_contains "selected highlight restores inverse"
+    ~needle:Ofzf.Terminal.selected_end_highlight selected_line;
+
+  let render_lines =
+    Ofzf.Interactive.render_lines ~terminal_height:4 ~query:"mat" ~selected:1
+      [ require_match "mat" "matcher.ml"; require_match "mat" "src/matcher.ml" ]
+  in
+  assert_true "render line count respects terminal height" (List.length render_lines = 4);
+  assert_contains "render status includes selected index" ~needle:"2/2 selected"
+    (List.nth render_lines 1);
+  let empty_lines =
+    Ofzf.Interactive.render_lines ~terminal_height:3 ~query:"zzz" ~selected:0 []
+  in
+  assert_equal_string_list "empty result render lines"
+    [ "> zzz";
+      "0 matches · no selection · ↑/↓ move · Enter select · Esc cancel";
+      "(no matches for \"zzz\")" ]
+    empty_lines;
+  let none_selected, none_code = Ofzf.Interactive.selected_result ~selected:0 [] in
+  assert_true "enter with no result has no selected output" (none_selected = None);
+  assert_true "enter with no result exits non-zero" (none_code = 1);
+  let some_selected, some_code =
+    Ofzf.Interactive.selected_result ~selected:0 [ highlight_result ]
+  in
+  assert_true "enter with a result selects it" (some_selected = Some highlight_result);
+  assert_true "enter with a result exits successfully" (some_code = 0);
 
   let cache = Ofzf.Query_cache.empty in
   assert_true "cache miss" (Ofzf.Query_cache.find ~query:"mat" cache = None);

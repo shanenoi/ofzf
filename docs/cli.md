@@ -1,7 +1,7 @@
 # CLI
 
 `ofzf` supports the original non-interactive fuzzy-filter modes plus an
-interactive terminal MVP when no query is provided.
+interactive terminal mode when no query is provided.
 
 ```sh
 cat input.txt | ofzf QUERY
@@ -57,7 +57,13 @@ Supported keys:
 - Ctrl-C exits non-zero.
 
 The result window is based on terminal height where practical. If height cannot
-be detected, `ofzf` falls back to a safe default.
+be detected, `ofzf` falls back to a safe default. The UI uses the alternate
+screen, highlights matched characters, shows the match count and selected index,
+and leaves stdout reserved for the selected candidate only.
+
+If Enter is pressed while there are no results, interactive mode exits non-zero
+without printing a selected line. Escape and Ctrl-C also cancel with non-zero
+status after attempting terminal cleanup.
 
 ## Benchmark mode
 

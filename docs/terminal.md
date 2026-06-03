@@ -26,10 +26,21 @@ and unexpected exceptions. Cleanup attempts to:
 1. show the cursor;
 2. clear the UI area;
 3. move the cursor back to the top-left;
-4. restore the saved terminal attributes;
-5. close the `/dev/tty` file descriptor.
+4. leave the alternate-screen buffer if active;
+5. restore the saved terminal attributes;
+6. close the `/dev/tty` file descriptor.
 
-`Terminal.restore` is idempotent, so repeated cleanup attempts are safe.
+`Terminal.restore` is idempotent, so repeated cleanup attempts are safe. It also
+attempts to show the cursor and leave the alternate screen before closing the
+terminal descriptor, which makes cleanup robust even if higher-level code calls
+only `restore` after an error.
+
+## Alternate screen
+
+`Terminal.enter_alternate_screen` emits `ESC [?1049h` and records that the
+handle is using the alternate buffer. `Terminal.leave_alternate_screen` emits
+`ESC [?1049l` only once. The state flag keeps restoration idempotent and avoids
+duplicated alternate-screen exit sequences.
 
 ## Key event handling
 
@@ -53,10 +64,14 @@ The module exposes helpers for:
 - clear screen;
 - move cursor;
 - hide cursor;
-- show cursor.
+- show cursor;
+- enter/leave alternate screen;
+- shared style fragments for inverse-video selection and matched-character
+  highlighting.
 
-Rendering remains intentionally simple in v0.6. Higher-level UI state belongs
-in `Interactive`, not in `Terminal`.
+Rendering remains intentionally simple. Higher-level UI state, viewport logic,
+result count formatting, and match-position highlighting belong in
+`Interactive`, not in `Terminal`.
 
 ## Terminal size
 
@@ -68,6 +83,5 @@ rows. This keeps the MVP usable in constrained environments.
 
 - No resize-event handling yet.
 - No mouse input.
-- No alternate-screen buffer.
 - No UTF-8-aware editing; Backspace removes one byte.
 - No async input or background indexing.

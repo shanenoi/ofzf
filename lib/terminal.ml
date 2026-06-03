@@ -12,7 +12,14 @@ type handle = {
   fd : Unix.file_descr;
   previous : Unix.terminal_io;
   mutable restored : bool;
+  mutable alternate_screen : bool;
 }
+
+let inverse = "\027[7m"
+let reset = "\027[0m"
+let highlight = "\027[1;4m"
+let end_highlight = "\027[22;24m"
+let selected_end_highlight = "\027[22;24;7m"
 
 let parse_key_sequence = function
   | "\003" -> Ctrl_c
@@ -50,15 +57,9 @@ let enter_raw_mode () =
         }
       in
       Unix.tcsetattr fd Unix.TCSANOW raw;
-      Ok { fd; previous; restored = false }
+      Ok { fd; previous; restored = false; alternate_screen = false }
   with Unix.Unix_error (error, function_name, argument) ->
     terminal_error "cannot enter raw mode" error function_name argument
-
-let restore handle =
-  if not handle.restored then (
-    handle.restored <- true;
-    (try Unix.tcsetattr handle.fd Unix.TCSANOW handle.previous with _ -> ());
-    try Unix.close handle.fd with _ -> ())
 
 let write handle text =
   let rec loop offset =
@@ -75,6 +76,24 @@ let move_cursor handle ~row ~col =
 
 let hide_cursor handle = write handle "\027[?25l"
 let show_cursor handle = write handle "\027[?25h"
+
+let enter_alternate_screen handle =
+  if not handle.alternate_screen then (
+    handle.alternate_screen <- true;
+    write handle "\027[?1049h")
+
+let leave_alternate_screen handle =
+  if handle.alternate_screen then (
+    handle.alternate_screen <- false;
+    write handle "\027[?1049l")
+
+let restore handle =
+  if not handle.restored then (
+    handle.restored <- true;
+    (try show_cursor handle with _ -> ());
+    (try leave_alternate_screen handle with _ -> ());
+    (try Unix.tcsetattr handle.fd Unix.TCSANOW handle.previous with _ -> ());
+    try Unix.close handle.fd with _ -> ())
 
 let read_char fd =
   let buffer = Bytes.create 1 in

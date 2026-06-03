@@ -13,7 +13,7 @@ original non-interactive fuzzy-filter behavior.
 
 ## Current status
 
-Implemented through v0.6 interactive terminal MVP:
+Implemented through v0.7 interactive highlighting and UI stabilization:
 
 - Case-insensitive subsequence fuzzy matching.
 - Match positions for future highlighting.
@@ -29,6 +29,11 @@ Implemented through v0.6 interactive terminal MVP:
 - Interactive mode with raw terminal input, ANSI rendering, arrow-key
   selection, Enter-to-select, Escape/Ctrl-C cancellation, and terminal
   restoration.
+- Interactive match highlighting from matcher positions.
+- Alternate-screen rendering with idempotent cleanup on selection, cancel, and
+  errors where practical.
+- Stable prompt/status layout with result counts, selected index, empty-result
+  messaging, and viewport edge-case handling.
 - CLI entry point that filters stdin using the query argument.
 - Unit tests for matcher, scoring, ranking, top-k, CLI parsing, and pure
   interactive helpers.

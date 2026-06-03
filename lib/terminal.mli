@@ -35,6 +35,16 @@ val clear_screen : handle -> unit
 val move_cursor : handle -> row:int -> col:int -> unit
 val hide_cursor : handle -> unit
 val show_cursor : handle -> unit
+val enter_alternate_screen : handle -> unit
+val leave_alternate_screen : handle -> unit
+
+val inverse : string
+val reset : string
+val highlight : string
+val end_highlight : string
+val selected_end_highlight : string
+(** ANSI style fragments used by the interactive renderer. Keeping these in the
+    terminal layer keeps styling escape sequences out of CLI/search code. *)
 
 val read_key : handle -> key
 (** Read one key event from the terminal. *)

@@ -14,10 +14,10 @@ stdin line stream + argv query/options
 interactive mode:
 stdin candidates + no argv query
   -> read candidates once
-  -> Terminal raw mode on /dev/tty
+  -> Terminal raw mode + alternate screen on /dev/tty
   -> Interactive loop
   -> Search_engine.incremental_search on query edits
-  -> ANSI-rendered result window on /dev/tty
+  -> ANSI-rendered highlighted result window on /dev/tty
   -> selected candidate on stdout
 
 bench mode:
@@ -119,9 +119,10 @@ exists.
 - open `/dev/tty` separately from stdin/stdout;
 - save and restore the previous terminal mode;
 - enter non-canonical, no-echo raw mode;
+- enter and leave the ANSI alternate-screen buffer;
 - decode character input, Backspace, Ctrl-C, Enter, Escape, and Up/Down arrows;
-- provide ANSI helpers for clearing the screen, cursor movement, and cursor
-  visibility;
+- provide ANSI helpers for clearing the screen, cursor movement, cursor
+  visibility, inverse-video selection, and matched-character highlighting;
 - detect terminal height where practical, with a safe fallback.
 
 Using `/dev/tty` lets stdin remain the candidate stream and stdout remain the
@@ -130,9 +131,11 @@ selected result stream.
 ### Interactive UI
 
 `lib/interactive.ml` owns query editing, selection movement, visible-window
-calculation, rendering, and terminal cleanup. It uses the existing incremental
-search engine whenever the query changes, then renders only the visible result
-window with ANSI inverse video on the selected row.
+calculation, highlighted rendering, and terminal cleanup. It uses the existing
+incremental search engine whenever the query changes, then renders only the
+visible result window. Normal rows highlight matched characters from matcher
+positions; the selected row combines inverse video with matched-character
+highlighting so both selection and relevance remain visible.
 
 ## Ranking behavior
 
@@ -162,7 +165,9 @@ bound to `O(k log K)` while preserving the same public API.
 
 Interactive mode loads candidates into memory once before entering raw mode, so
 future keystrokes can use the incremental search engine. Rendering cost is
-bounded by the visible terminal rows rather than the total result count.
+bounded by the visible terminal rows rather than the total result count. The
+renderer clears stale content on each redraw and caps pure render output to the
+detected terminal height, including very small terminal heights.
 
 ## Future optimization plan
 
@@ -175,5 +180,5 @@ The architecture leaves room for fzf-style speed improvements:
 5. Add early bailouts when a candidate cannot beat the top-k threshold.
 6. Parallelize scoring across chunks for non-streaming batch use cases.
 7. Improve terminal redraw minimality and handle terminal resize events.
-8. Add highlight rendering from match positions.
+8. Cache pre-rendered candidate fragments for large interactive result sets.
 9. Add preview windows and multi-select only after the matching core is stable.
