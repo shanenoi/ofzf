@@ -58,7 +58,14 @@ standard output.
 ## Development
 
 ```sh
-dune build
+make build
+```
+
+On macOS, if a Homebrew LLVM/clang install points at a stale SDK and Dune fails
+with `library 'System' not found` or `library 'pthread' not found`, use:
+
+```sh
+make build-macos
 ```
 
 ```sh
@@ -78,7 +85,7 @@ dune exec ofzf -- < candidates.txt
 ```
 
 ```sh
-dune runtest
+make test
 ```
 
 ## Benchmark
