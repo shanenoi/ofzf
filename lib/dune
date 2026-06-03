@@ -1,2 +1,3 @@
 (library
- (name ofzf))
+ (name ofzf)
+ (libraries unix))

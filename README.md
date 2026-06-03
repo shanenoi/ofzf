@@ -2,7 +2,8 @@
 
 `ofzf` is a small fzf-like fuzzy finder written in OCaml.
 
-The first milestone is intentionally simple: a non-interactive fuzzy filter that reads candidates from standard input and prints ranked matches.
+The project now has a small interactive terminal MVP while preserving the
+original non-interactive fuzzy-filter behavior.
 
 ## Goals
 
@@ -12,7 +13,7 @@ The first milestone is intentionally simple: a non-interactive fuzzy filter that
 
 ## Current status
 
-Implemented through v0.5 incremental query engine:
+Implemented through v0.6 interactive terminal MVP:
 
 - Case-insensitive subsequence fuzzy matching.
 - Match positions for future highlighting.
@@ -25,8 +26,12 @@ Implemented through v0.5 incremental query engine:
 - Statistics for scanned candidates, matches, cache hit/miss, and reuse counts.
 - `--bench QUERY` CLI mode for full vs incremental measurements.
 - Benchmark executable comparing full and incremental ranking behavior.
+- Interactive mode with raw terminal input, ANSI rendering, arrow-key
+  selection, Enter-to-select, Escape/Ctrl-C cancellation, and terminal
+  restoration.
 - CLI entry point that filters stdin using the query argument.
-- Unit tests for matcher, scoring, ranking, and top-k behavior.
+- Unit tests for matcher, scoring, ranking, top-k, CLI parsing, and pure
+  interactive helpers.
 
 ## Usage
 
@@ -40,6 +45,15 @@ Expected output:
 help
 hello
 ```
+
+Interactive mode starts when no query is provided:
+
+```sh
+printf 'hello\nhelp\nworld\n' | dune exec ofzf --
+```
+
+The UI renders to the controlling terminal and prints only the selected line to
+standard output.
 
 ## Development
 
@@ -57,6 +71,10 @@ dune exec ofzf -- --limit 20 query < candidates.txt
 
 ```sh
 dune exec ofzf -- --bench query < candidates.txt
+```
+
+```sh
+dune exec ofzf -- < candidates.txt
 ```
 
 ```sh

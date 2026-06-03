@@ -1,7 +1,7 @@
 # Architecture
 
-`ofzf` is currently a non-interactive fuzzy filter. It reads candidates from
-standard input, ranks matches for a query, and prints only matching lines.
+`ofzf` is a fuzzy finder with two process-level paths: a backward-compatible
+non-interactive filter and a small interactive terminal MVP.
 
 ```text
 stdin line stream + argv query/options
@@ -10,6 +10,15 @@ stdin line stream + argv query/options
   -> Ofzf.Matcher.match_candidate per line
   -> full sort or Topk.add
   -> ranked matching lines on stdout
+
+interactive mode:
+stdin candidates + no argv query
+  -> read candidates once
+  -> Terminal raw mode on /dev/tty
+  -> Interactive loop
+  -> Search_engine.incremental_search on query edits
+  -> ANSI-rendered result window on /dev/tty
+  -> selected candidate on stdout
 
 bench mode:
 stdin candidates + query
@@ -24,14 +33,16 @@ stdin candidates + query
 
 `bin/main.ml` owns process-level behavior:
 
-- parse `QUERY`, `--limit N QUERY`, or `--bench QUERY`;
+- parse no-query interactive mode, `QUERY`, `--limit N QUERY`, or
+  `--bench QUERY`;
 - read candidate lines from standard input one at a time;
 - match and score each line as it arrives;
 - keep every match for full ranking, or only the best `N` for limited ranking;
 - print only the ranked matching candidate text.
 
-It intentionally does not know about terminal UI, raw mode, previews, or
-selection state.
+The non-interactive search path intentionally does not know about terminal UI,
+raw mode, previews, or selection state. Interactive mode reads all candidates
+once, then hands control to `Interactive`.
 
 ### Matcher library
 
@@ -101,6 +112,28 @@ keeps command-line behavior testable without spawning a process.
 This gives each ranking milestone a simple regression check before terminal UI
 exists.
 
+### Terminal library
+
+`lib/terminal.ml` owns low-level terminal behavior without ncurses:
+
+- open `/dev/tty` separately from stdin/stdout;
+- save and restore the previous terminal mode;
+- enter non-canonical, no-echo raw mode;
+- decode character input, Backspace, Ctrl-C, Enter, Escape, and Up/Down arrows;
+- provide ANSI helpers for clearing the screen, cursor movement, and cursor
+  visibility;
+- detect terminal height where practical, with a safe fallback.
+
+Using `/dev/tty` lets stdin remain the candidate stream and stdout remain the
+selected result stream.
+
+### Interactive UI
+
+`lib/interactive.ml` owns query editing, selection movement, visible-window
+calculation, rendering, and terminal cleanup. It uses the existing incremental
+search engine whenever the query changes, then renders only the visible result
+window with ANSI inverse video on the selected row.
+
 ## Ranking behavior
 
 Candidates that do not match are removed. Matching candidates are scored and
@@ -127,7 +160,9 @@ The top-k implementation avoids allocating a full sorted result list when a
 caller only needs the best `K` candidates. A future heap can reduce the top-k
 bound to `O(k log K)` while preserving the same public API.
 
-No terminal UI exists yet, so there is no rendering loop or raw-mode state.
+Interactive mode loads candidates into memory once before entering raw mode, so
+future keystrokes can use the incremental search engine. Rendering cost is
+bounded by the visible terminal rows rather than the total result count.
 
 ## Future optimization plan
 
@@ -139,6 +174,6 @@ The architecture leaves room for fzf-style speed improvements:
 4. Upgrade top-k from bounded insertion list to a binary heap for large `K`.
 5. Add early bailouts when a candidate cannot beat the top-k threshold.
 6. Parallelize scoring across chunks for non-streaming batch use cases.
-7. Add a terminal UI layer above the streaming/top-k core.
+7. Improve terminal redraw minimality and handle terminal resize events.
 8. Add highlight rendering from match positions.
 9. Add preview windows and multi-select only after the matching core is stable.

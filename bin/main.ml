@@ -77,6 +77,9 @@ let () =
   | Error error ->
       print_usage_error program error;
       exit 2
+  | Ok { mode = Interactive; _ } ->
+      let candidates = read_all_stdin () in
+      exit (Ofzf.Interactive.run ~candidates)
   | Ok { query; limit; mode = Bench } -> run_bench query limit
   | Ok { query; limit = Some 0; mode = Search } -> ignore query
   | Ok { query; limit = Some limit; mode = Search } -> run_limited query limit

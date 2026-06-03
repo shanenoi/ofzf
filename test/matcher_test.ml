@@ -49,6 +49,9 @@ let assert_cli_error message argv =
   | Ok _ -> failwith (message ^ ": expected parse error")
   | Error _ -> ()
 
+let assert_equal_key message expected actual =
+  if expected <> actual then failwith (message ^ ": unexpected key")
+
 let score query candidate = (require_match query candidate).score
 
 let () =
@@ -134,6 +137,8 @@ let () =
     (take 3 full_rank) top_three;
 
   let open Ofzf.Cli in
+  assert_cli_ok "parse interactive mode" [ "ofzf" ]
+    { query = ""; limit = None; mode = Interactive };
   assert_cli_ok "parse query" [ "ofzf"; "abc" ]
     { query = "abc"; limit = None; mode = Search };
   assert_cli_ok "parse limit" [ "ofzf"; "--limit"; "2"; "abc" ]
@@ -144,9 +149,58 @@ let () =
     { query = "abc"; limit = None; mode = Bench };
   assert_cli_ok "parse bench with limit" [ "ofzf"; "--bench"; "--limit"; "2"; "abc" ]
     { query = "abc"; limit = Some 2; mode = Bench };
-  assert_cli_error "missing query" [ "ofzf" ];
+  assert_cli_error "bench missing query" [ "ofzf"; "--bench" ];
+  assert_cli_error "limit missing query" [ "ofzf"; "--limit"; "2" ];
   assert_cli_error "invalid limit" [ "ofzf"; "--limit"; "wat"; "abc" ];
   assert_cli_error "negative limit" [ "ofzf"; "--limit"; "-1"; "abc" ];
+
+  assert_equal_key "parse arrow up" Ofzf.Terminal.Arrow_up
+    (Ofzf.Terminal.parse_key_sequence "\027[A");
+  assert_equal_key "parse arrow down" Ofzf.Terminal.Arrow_down
+    (Ofzf.Terminal.parse_key_sequence "\027[B");
+  assert_equal_key "parse backspace" Ofzf.Terminal.Backspace
+    (Ofzf.Terminal.parse_key_sequence "\127");
+  assert_equal_key "parse ctrl-c" Ofzf.Terminal.Ctrl_c
+    (Ofzf.Terminal.parse_key_sequence "\003");
+  assert_equal_key "parse enter" Ofzf.Terminal.Enter
+    (Ofzf.Terminal.parse_key_sequence "\r");
+  assert_equal_key "parse escape" Ofzf.Terminal.Escape
+    (Ofzf.Terminal.parse_key_sequence "\027");
+  assert_equal_key "parse character" (Ofzf.Terminal.Character 'a')
+    (Ofzf.Terminal.parse_key_sequence "a");
+
+  assert_true "interactive result rows leaves room for prompt"
+    (Ofzf.Interactive.result_rows ~terminal_height:20 = 17);
+  assert_true "interactive result rows has safe minimum"
+    (Ofzf.Interactive.result_rows ~terminal_height:1 = 1);
+  assert_true "selection clamps empty result set"
+    (Ofzf.Interactive.clamp_selection ~selected:10 ~result_count:0 = 0);
+  assert_true "selection clamps high values"
+    (Ofzf.Interactive.clamp_selection ~selected:10 ~result_count:3 = 2);
+  assert_true "selection clamps low values"
+    (Ofzf.Interactive.clamp_selection ~selected:(-1) ~result_count:3 = 0);
+  assert_true "arrow down moves selection"
+    (Ofzf.Interactive.apply_key_to_selection Ofzf.Terminal.Arrow_down
+       ~selected:0 ~result_count:3
+    = 1);
+  assert_true "arrow up moves selection"
+    (Ofzf.Interactive.apply_key_to_selection Ofzf.Terminal.Arrow_up ~selected:1
+       ~result_count:3
+    = 0);
+  assert_true "visible window keeps selected row visible"
+    (Ofzf.Interactive.visible_window ~selected:7 ~terminal_height:6
+       ~result_count:10
+    = (5, 8));
+  assert_true "character edits query"
+    (Ofzf.Interactive.apply_key_to_query (Ofzf.Terminal.Character 'm')
+       ~query:""
+    = "m");
+  assert_true "backspace edits query"
+    (Ofzf.Interactive.apply_key_to_query Ofzf.Terminal.Backspace ~query:"mat"
+    = "ma");
+  assert_true "non-editing key keeps query"
+    (Ofzf.Interactive.apply_key_to_query Ofzf.Terminal.Arrow_down ~query:"mat"
+    = "mat");
 
   let cache = Ofzf.Query_cache.empty in
   assert_true "cache miss" (Ofzf.Query_cache.find ~query:"mat" cache = None);

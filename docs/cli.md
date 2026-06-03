@@ -1,17 +1,17 @@
 # CLI
 
-`ofzf` remains a non-interactive fuzzy filter. It reads candidates from standard
-input, ranks matching lines for a query, and prints only the matching candidate
-text.
+`ofzf` supports the original non-interactive fuzzy-filter modes plus an
+interactive terminal MVP when no query is provided.
 
 ```sh
 cat input.txt | ofzf QUERY
 cat input.txt | ofzf --limit N QUERY
 cat input.txt | ofzf --bench QUERY
+cat input.txt | ofzf
 ```
 
-No terminal UI, raw mode, ncurses, preview window, or multi-select behavior is
-implemented in this milestone.
+No ncurses, preview window, multi-select behavior, mouse support, background
+indexing, or shell integration is implemented in this milestone.
 
 ## Argument handling
 
@@ -21,13 +21,43 @@ Supported forms:
 - `ofzf --limit N QUERY` performs bounded top-k ranking and prints at most `N`
   matching lines.
 - `ofzf --bench QUERY` prints benchmark and incremental-search statistics.
+- `ofzf` reads stdin candidates once, starts interactive mode on `/dev/tty`, and
+  prints only the selected candidate to stdout.
 
 Error behavior:
 
-- missing query prints usage to stderr and exits non-zero;
+- missing query in option-driven modes such as `--bench` or `--limit N` prints
+  usage to stderr and exits non-zero;
 - invalid `--limit` prints a clear error to stderr and exits non-zero;
 - negative `--limit` prints a clear error to stderr and exits non-zero;
 - `--limit 0` prints nothing and exits successfully.
+- empty stdin in interactive mode prints a clear error and exits non-zero;
+- unavailable controlling terminal in interactive mode prints a clear error and
+  exits non-zero.
+
+## Interactive mode
+
+Interactive mode is selected only by the no-query form:
+
+```sh
+cat input.txt | ofzf
+```
+
+The candidate list is read from stdin before raw mode starts. The UI opens
+`/dev/tty`, enters raw mode, renders with ANSI escape sequences, and restores
+the previous terminal mode on Enter, Escape, Ctrl-C, and errors where practical.
+
+Supported keys:
+
+- printable characters append to the query;
+- Backspace removes one byte from the query;
+- Arrow Up/Down moves the selected row;
+- Enter prints the selected candidate to stdout and exits successfully;
+- Escape exits non-zero;
+- Ctrl-C exits non-zero.
+
+The result window is based on terminal height where practical. If height cannot
+be detected, `ofzf` falls back to a safe default.
 
 ## Benchmark mode
 
@@ -69,8 +99,9 @@ For total input size `S`, matching count `m`, and limit `K`:
 - each retained result stores candidate text, match positions, score, and input
   index.
 
-Benchmark mode is intentionally not streaming because it must run full and
-incremental comparisons over the same candidate list.
+Benchmark and interactive modes intentionally retain the candidate list:
+benchmark mode needs repeated comparisons over the same candidates, while
+interactive mode needs fast re-searching on each query edit.
 
 ## Full ranking vs limited ranking
 

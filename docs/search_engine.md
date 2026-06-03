@@ -1,7 +1,7 @@
 # Search Engine
 
-`Search_engine` is the non-interactive engine that prepares `ofzf` for future
-interactive search. It sits above `Matcher`, `Scoring`, and `Topk`.
+`Search_engine` is the reusable engine behind benchmark mode and the
+interactive terminal MVP. It sits above `Matcher`, `Scoring`, and `Topk`.
 
 ```text
 candidate list + query + search_context
@@ -11,8 +11,8 @@ candidate list + query + search_context
   -> updated search_context + statistics
 ```
 
-No terminal UI, raw mode, preview window, or multi-select behavior is part of
-this layer.
+No raw-mode or rendering behavior is part of this layer; terminal concerns live
+in `Terminal` and `Interactive`.
 
 ## Full search
 
@@ -74,8 +74,9 @@ or future interactive session can report cache effectiveness across keystrokes.
 prefix-by-prefix. It prints the normal full-search timing plus cache and
 incremental counters from the simulated incremental path.
 
-Normal CLI search remains streaming. Benchmark mode intentionally retains the
-candidate list so it can compare full and incremental paths over the same input.
+Normal query-based CLI search remains streaming. Benchmark and interactive modes
+retain the candidate list so they can compare or repeat searches over the same
+input.
 
 ## Complexity analysis
 

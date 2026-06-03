@@ -1,8 +1,9 @@
 (** Command-line argument parsing for [ofzf]. *)
 
-type mode = Search | Bench
+type mode = Search | Bench | Interactive
 (** CLI mode. [Search] preserves normal filter behavior. [Bench] prints
-    search-engine timing and cache statistics instead of matching lines. *)
+    search-engine timing and cache statistics instead of matching lines.
+    [Interactive] starts the terminal UI when no query is provided. *)
 
 type config = {
   query : string;
@@ -17,6 +18,7 @@ type error = Missing_query | Invalid_limit of string | Negative_limit of int
 val parse : string array -> (config, error) result
 (** Parse argv-style arguments. Supported forms are:
 
+    - [ofzf]
     - [ofzf QUERY]
     - [ofzf --limit N QUERY]
     - [ofzf --bench QUERY]

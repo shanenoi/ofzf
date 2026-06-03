@@ -1,4 +1,4 @@
-type mode = Search | Bench
+type mode = Search | Bench | Interactive
 
 type config = {
   query : string;
@@ -8,7 +8,8 @@ type config = {
 
 type error = Missing_query | Invalid_limit of string | Negative_limit of int
 
-let usage program = Printf.sprintf "usage: %s [--bench] [--limit N] QUERY" program
+let usage program =
+  Printf.sprintf "usage: %s [--bench] [--limit N] [QUERY]" program
 
 let parse_limit raw =
   match int_of_string_opt raw with
@@ -18,7 +19,10 @@ let parse_limit raw =
 
 let parse argv =
   let rec loop mode limit = function
-    | [] -> Error Missing_query
+    | [] -> (
+        match (mode, limit) with
+        | Search, None -> Ok { query = ""; limit = None; mode = Interactive }
+        | _ -> Error Missing_query)
     | "--bench" :: rest -> loop Bench limit rest
     | "--limit" :: raw_limit :: rest -> (
         match parse_limit raw_limit with
