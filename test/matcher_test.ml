@@ -30,6 +30,25 @@ let ranked_top_candidates query k candidates =
   Ofzf.Matcher.rank_top ~query ~k candidates
   |> List.map (fun result -> result.Ofzf.Matcher.candidate)
 
+let take count values =
+  let rec loop remaining acc = function
+    | _ when remaining <= 0 -> List.rev acc
+    | [] -> List.rev acc
+    | value :: rest -> loop (remaining - 1) (value :: acc) rest
+  in
+  loop count [] values
+
+let assert_cli_ok message argv expected =
+  match Ofzf.Cli.parse (Array.of_list argv) with
+  | Ok actual when actual = expected -> ()
+  | Ok _ -> failwith (message ^ ": parsed unexpected config")
+  | Error _ -> failwith (message ^ ": expected parse success")
+
+let assert_cli_error message argv =
+  match Ofzf.Cli.parse (Array.of_list argv) with
+  | Ok _ -> failwith (message ^ ": expected parse error")
+  | Error _ -> ()
+
 let score query candidate = (require_match query candidate).score
 
 let () =
@@ -101,4 +120,25 @@ let () =
     [ "same"; "same" ] (ranked_top_candidates "sam" 2 [ "same"; "same"; "same" ]);
 
   assert_equal_string_list "top-k zero returns no matches" []
-    (ranked_top_candidates "abc" 0 [ "abc" ])
+    (ranked_top_candidates "abc" 0 [ "abc" ]);
+
+  let full_rank =
+    ranked_candidates "abc"
+      [ "a___b___c"; "src/abc"; "abc"; "sameabc"; "a_bc"; "abc-long" ]
+  in
+  let top_three =
+    ranked_top_candidates "abc" 3
+      [ "a___b___c"; "src/abc"; "abc"; "sameabc"; "a_bc"; "abc-long" ]
+  in
+  assert_equal_string_list "top-k matches full ranking prefix"
+    (take 3 full_rank) top_three;
+
+  let open Ofzf.Cli in
+  assert_cli_ok "parse query" [ "ofzf"; "abc" ] { query = "abc"; limit = None };
+  assert_cli_ok "parse limit" [ "ofzf"; "--limit"; "2"; "abc" ]
+    { query = "abc"; limit = Some 2 };
+  assert_cli_ok "parse zero limit" [ "ofzf"; "--limit"; "0"; "abc" ]
+    { query = "abc"; limit = Some 0 };
+  assert_cli_error "missing query" [ "ofzf" ];
+  assert_cli_error "invalid limit" [ "ofzf"; "--limit"; "wat"; "abc" ];
+  assert_cli_error "negative limit" [ "ofzf"; "--limit"; "-1"; "abc" ]

@@ -4,10 +4,11 @@
 standard input, ranks matches for a query, and prints only matching lines.
 
 ```text
-stdin lines + argv query
+stdin line stream + argv query/options
   -> bin/main.ml
-  -> Ofzf.Matcher.rank
-  -> Ofzf.Scoring.rank
+  -> Ofzf.Cli.parse
+  -> Ofzf.Matcher.match_candidate per line
+  -> full sort or Topk.add
   -> ranked matching lines on stdout
 ```
 
@@ -17,9 +18,10 @@ stdin lines + argv query
 
 `bin/main.ml` owns process-level behavior:
 
-- read every candidate line from standard input;
-- read the query from the first command-line argument;
-- call the matcher library;
+- parse `QUERY` or `--limit N QUERY`;
+- read candidate lines from standard input one at a time;
+- match and score each line as it arrives;
+- keep every match for full ranking, or only the best `N` for limited ranking;
 - print only the ranked matching candidate text.
 
 It intentionally does not know about terminal UI, raw mode, previews, or
@@ -53,12 +55,14 @@ calculation to `Scoring`.
 
 ### Top-k library
 
-`lib/topk.ml` maintains a bounded list of the best results. It orders by
-score descending and then by original input index ascending. This lets future
-interactive views keep only visible results without fully sorting every match.
+`lib/topk.ml` maintains a bounded list of the best results. It orders by score
+descending and then by original input index ascending. The CLI uses `Topk.add`
+for `--limit N`, so limited searches do not retain every matching candidate.
 
-The current CLI still calls full ranking so its behavior remains unchanged.
-Top-k exists as an engine-level optimization primitive.
+### CLI parser
+
+`lib/cli.ml` parses process arguments and centralizes usage/error messages. It
+keeps command-line behavior testable without spawning a process.
 
 ### Benchmark executable
 
@@ -66,10 +70,12 @@ Top-k exists as an engine-level optimization primitive.
 
 - candidate count;
 - query length;
+- limit;
 - matching count;
 - matching time;
-- ranking time;
-- ranked count.
+- full ranking time;
+- top-k ranking time;
+- full and top-k result counts.
 
 This gives each ranking milestone a simple regression check before terminal UI
 exists.
@@ -87,10 +93,11 @@ For `m` candidates, total input size `N`, query length `q`, and `k` matches:
 
 - matching is `O(N)`;
 - scoring is `O(k * q)`;
-- full ranking is `O(k log k)`;
-- top-k ranking is `O(k * K)` with the current small bounded-list
+- full ranking is `O(k log k)` and stores `O(k)` matched results;
+- top-k streaming is `O(k * K)` with the current small bounded-list
   implementation, where `K` is the requested result count;
-- memory is `O(m)` for CLI input plus `O(k * q)` for match positions.
+- full CLI memory is `O(k)` retained matches;
+- limited CLI memory is `O(K)` retained matches.
 
 The top-k implementation avoids allocating a full sorted result list when a
 caller only needs the best `K` candidates. A future heap can reduce the top-k
@@ -102,11 +109,11 @@ No terminal UI exists yet, so there is no rendering loop or raw-mode state.
 
 The architecture leaves room for fzf-style speed improvements:
 
-1. Cache normalized candidate data once after stdin is loaded.
-2. Replace list positions with arrays or reusable buffers on hot paths.
+1. Replace list positions with arrays or reusable buffers on hot paths.
+2. Cache normalized candidate metadata in future interactive sessions.
 3. Upgrade top-k from bounded insertion list to a binary heap for large `K`.
-4. Parallelize scoring across chunks.
-5. Add early bailouts when a candidate cannot beat the top-k threshold.
-6. Add a terminal UI layer above `Matcher.rank_top`.
+4. Add early bailouts when a candidate cannot beat the top-k threshold.
+5. Parallelize scoring across chunks for non-streaming batch use cases.
+6. Add a terminal UI layer above the streaming/top-k core.
 7. Add highlight rendering from match positions.
 8. Add preview windows and multi-select only after the matching core is stable.

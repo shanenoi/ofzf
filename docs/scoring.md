@@ -154,8 +154,8 @@ This is important for shell pipelines because the input order may already encode
 useful information from tools such as `find`, `git ls-files`, or `rg --files`.
 
 `Scoring.rank_top` uses the same comparison but keeps only the best `K` results.
-It returns results in the same order those items would have had after a full
-rank.
+The streaming CLI uses `Topk.add` directly with the same comparison data, so
+limited output has the same order as the first `K` results from a full rank.
 
 ## Complexity analysis
 

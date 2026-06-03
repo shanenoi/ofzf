@@ -31,3 +31,5 @@ let of_list ~k items =
   else
     let add best item = best |> insert_sorted item |> take k in
     List.fold_left add [] items
+
+let add ~k best item = if k <= 0 then [] else best |> insert_sorted item |> take k
