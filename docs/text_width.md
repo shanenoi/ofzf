@@ -75,3 +75,7 @@ complete grapheme-aware editor.
 
 Future versions can replace the internal width table with a generated `wcwidth`
 implementation while preserving the public helper API.
+
+## Preview clipping
+
+Preview content uses the same width-aware clipping helpers as result rows and prompts. This keeps long selected candidates from overflowing the preview pane and avoids cutting inside decoded UTF-8 cells where practical.

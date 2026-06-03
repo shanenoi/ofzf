@@ -202,3 +202,7 @@ The architecture leaves room for fzf-style speed improvements:
 7. Improve terminal redraw minimality and add signal-driven resize handling.
 8. Cache pre-rendered candidate fragments for large interactive result sets.
 9. Add preview windows and multi-select only after the matching core is stable.
+
+### Preview foundation
+
+`lib/preview.ml` owns pure preview layout calculations. Interactive mode can request no preview, right-side preview, or bottom preview. v0.11 previews the selected candidate text only; it deliberately does not execute shell commands or expand placeholders. Tiny terminals hide preview and keep the result list usable.

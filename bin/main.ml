@@ -77,9 +77,14 @@ let () =
   | Error error ->
       print_usage_error program error;
       exit 2
-  | Ok { mode = Interactive; _ } ->
+  | Ok { mode = Interactive; query; preview; preview_position; _ } ->
       let candidates = read_all_stdin () in
-      exit (Ofzf.Interactive.run ~candidates)
+      let preview_position =
+        match preview_position with
+        | Ofzf.Cli.Preview_right -> Ofzf.Preview.Right
+        | Ofzf.Cli.Preview_bottom -> Ofzf.Preview.Bottom
+      in
+      exit (Ofzf.Interactive.run ~preview ~preview_position ~initial_query:query ~candidates)
   | Ok { query; limit; mode = Bench } -> run_bench query limit
   | Ok { query; limit = Some 0; mode = Search } -> ignore query
   | Ok { query; limit = Some limit; mode = Search } -> run_limited query limit

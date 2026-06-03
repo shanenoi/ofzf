@@ -25,7 +25,7 @@ val apply_key_to_query : Terminal.key -> query:string -> string
 val apply_key_to_selection : Terminal.key -> selected:int -> result_count:int -> int
 (** Pure selection movement helper. *)
 
-val format_status : result_count:int -> selected:int -> string
+val format_status : preview:bool -> result_count:int -> selected:int -> string
 (** Human-readable status line for the current result set. *)
 
 val empty_results_message : query:string -> string
@@ -42,8 +42,13 @@ val render_candidate_clipped :
 val render_result_line : ?terminal_width:int -> selected:bool -> Matcher.match_result -> string
 (** Render one result row, including selected-row styling when requested. *)
 
+val render_preview_pane : terminal_width:int -> selected:string option -> string list
+(** Pure preview-pane renderer used by tests. *)
+
 val render_lines :
   ?terminal_width:int ->
+  ?preview:bool ->
+  ?preview_position:Preview.position ->
   terminal_height:int ->
   query:string ->
   selected:int ->
@@ -56,5 +61,5 @@ val selected_result : selected:int -> Matcher.match_result list -> (Matcher.matc
 (** Enter-key result helper. Returns [(Some result, 0)] when a result exists and
     [(None, 1)] when Enter is pressed with no selectable result. *)
 
-val run : candidates:string list -> int
+val run : ?preview:bool -> ?preview_position:Preview.position -> ?initial_query:string -> candidates:string list -> int
 (** Run interactive mode. Returns the intended process exit code. *)

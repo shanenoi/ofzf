@@ -90,3 +90,7 @@ matches outside the clipped range from emitting stray ANSI sequences.
 Selected rows still wrap the full visible row in inverse video. When a matched
 cell appears inside a selected row, the match style is closed with a sequence
 that restores inverse video so selection remains readable.
+
+## Preview interaction
+
+Preview mode does not change result highlighting. Match highlighting remains confined to result rows, while preview content is plain selected-candidate text clipped with `Text_width`.

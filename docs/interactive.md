@@ -161,3 +161,9 @@ positions are still byte indexes, but highlighted cells are chosen by checking
 whether a matched byte falls inside each decoded display cell. ASCII candidates
 keep the exact behavior from earlier versions, while UTF-8 candidates render
 without cutting inside a character where practical.
+
+## Preview foundation
+
+When `--preview` is enabled, interactive mode asks `Preview.compute_layout` for result and preview bounds. The preview pane updates synchronously when selection or query changes and displays the selected candidate text. If there is no selection, it shows a no-selected-result message.
+
+Right-side preview is used by default. Bottom preview can be selected with `--preview-position bottom`. Tiny terminals hide preview rather than rendering past bounds.

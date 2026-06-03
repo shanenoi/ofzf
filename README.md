@@ -13,7 +13,7 @@ original non-interactive fuzzy-filter behavior.
 
 ## Current status
 
-Implemented through v0.10 Unicode + text-width correctness:
+Implemented through v0.11 Preview Window Foundation:
 
 - Case-insensitive subsequence fuzzy matching.
 - Match positions for future highlighting.
@@ -45,6 +45,8 @@ Implemented through v0.10 Unicode + text-width correctness:
   invalid UTF-8 bytes.
 - Display-width clipping for prompts and result rows so interactive rendering no
   longer clips by byte length or splits UTF-8 sequences where practical.
+- Optional interactive preview foundation with right-side or bottom layouts.
+- `--preview` previews the selected candidate itself without executing commands.
 - CLI entry point that filters stdin using the query argument.
 - Unit tests for matcher, scoring, ranking, top-k, CLI parsing, and pure
   interactive helpers.
@@ -98,6 +100,10 @@ dune exec ofzf -- --bench query < candidates.txt
 
 ```sh
 dune exec ofzf -- < candidates.txt
+```
+
+```sh
+dune exec ofzf -- --preview --preview-position right < candidates.txt
 ```
 
 ```sh

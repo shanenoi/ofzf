@@ -172,21 +172,29 @@ let () =
 
   let open Ofzf.Cli in
   assert_cli_ok "parse interactive mode" [ "ofzf" ]
-    { query = ""; limit = None; mode = Interactive };
+    { query = ""; limit = None; mode = Interactive; preview = false; preview_position = Preview_right };
   assert_cli_ok "parse query" [ "ofzf"; "abc" ]
-    { query = "abc"; limit = None; mode = Search };
+    { query = "abc"; limit = None; mode = Search; preview = false; preview_position = Preview_right };
   assert_cli_ok "parse limit" [ "ofzf"; "--limit"; "2"; "abc" ]
-    { query = "abc"; limit = Some 2; mode = Search };
+    { query = "abc"; limit = Some 2; mode = Search; preview = false; preview_position = Preview_right };
   assert_cli_ok "parse zero limit" [ "ofzf"; "--limit"; "0"; "abc" ]
-    { query = "abc"; limit = Some 0; mode = Search };
+    { query = "abc"; limit = Some 0; mode = Search; preview = false; preview_position = Preview_right };
   assert_cli_ok "parse bench" [ "ofzf"; "--bench"; "abc" ]
-    { query = "abc"; limit = None; mode = Bench };
+    { query = "abc"; limit = None; mode = Bench; preview = false; preview_position = Preview_right };
   assert_cli_ok "parse bench with limit" [ "ofzf"; "--bench"; "--limit"; "2"; "abc" ]
-    { query = "abc"; limit = Some 2; mode = Bench };
+    { query = "abc"; limit = Some 2; mode = Bench; preview = false; preview_position = Preview_right };
   assert_cli_error "bench missing query" [ "ofzf"; "--bench" ];
   assert_cli_error "limit missing query" [ "ofzf"; "--limit"; "2" ];
   assert_cli_error "invalid limit" [ "ofzf"; "--limit"; "wat"; "abc" ];
   assert_cli_error "negative limit" [ "ofzf"; "--limit"; "-1"; "abc" ];
+
+  assert_cli_ok "parse preview interactive with query" [ "ofzf"; "--preview"; "abc" ]
+    { query = "abc"; limit = None; mode = Interactive; preview = true; preview_position = Preview_right };
+  assert_cli_ok "parse preview right" [ "ofzf"; "--preview"; "--preview-position"; "right"; "abc" ]
+    { query = "abc"; limit = None; mode = Interactive; preview = true; preview_position = Preview_right };
+  assert_cli_ok "parse preview bottom" [ "ofzf"; "--preview"; "--preview-position"; "bottom"; "abc" ]
+    { query = "abc"; limit = None; mode = Interactive; preview = true; preview_position = Preview_bottom };
+  assert_cli_error "invalid preview position" [ "ofzf"; "--preview"; "--preview-position"; "side"; "abc" ];
 
   assert_equal_key "parse arrow up" Ofzf.Terminal.Arrow_up
     (Ofzf.Terminal.parse_key_sequence "\027[A");
@@ -221,6 +229,30 @@ let () =
     (normalized.rows = 24);
   assert_true "terminal size normalization falls back for bad cols"
     (normalized.cols = 100);
+
+  assert_true "parse preview position right" (Ofzf.Preview.parse_position "right" = Some Ofzf.Preview.Right);
+  assert_true "parse preview position bottom" (Ofzf.Preview.parse_position "bottom" = Some Ofzf.Preview.Bottom);
+  assert_true "parse invalid preview position" (Ofzf.Preview.parse_position "side" = None);
+  let right_layout = Ofzf.Preview.compute_layout ~terminal_rows:20 ~terminal_cols:80 ~preview:true ~position:Ofzf.Preview.Right in
+  assert_true "right preview layout enabled" right_layout.enabled;
+  assert_true "right preview has preview rect" (right_layout.preview <> None);
+  assert_true "right preview preserves result columns" (right_layout.results.cols >= Ofzf.Preview.min_result_cols);
+  let bottom_layout = Ofzf.Preview.compute_layout ~terminal_rows:24 ~terminal_cols:80 ~preview:true ~position:Ofzf.Preview.Bottom in
+  assert_true "bottom preview layout enabled" bottom_layout.enabled;
+  assert_true "bottom preview preserves result rows" (bottom_layout.results.rows >= Ofzf.Preview.min_result_rows);
+  let tiny_layout = Ofzf.Preview.compute_layout ~terminal_rows:4 ~terminal_cols:20 ~preview:true ~position:Ofzf.Preview.Right in
+  assert_true "tiny preview layout falls back to no preview" (not tiny_layout.enabled);
+  let no_preview_layout = Ofzf.Preview.compute_layout ~terminal_rows:20 ~terminal_cols:80 ~preview:false ~position:Ofzf.Preview.Right in
+  assert_true "no preview layout disabled" (not no_preview_layout.enabled);
+  assert_equal_string_list "no selected preview message"
+    [ "preview: no selected result" ]
+    (Ofzf.Preview.render_preview_lines ~terminal_width:80 ~selected:None);
+  assert_equal_string_list "selected preview renders candidate"
+    [ "preview: selected candidate"; "matcher.ml" ]
+    (Ofzf.Preview.render_preview_lines ~terminal_width:80 ~selected:(Some "matcher.ml"));
+  assert_equal_string_list "selected preview clips long text"
+    [ "preview:"; "matcher." ]
+    (Ofzf.Preview.render_preview_lines ~terminal_width:8 ~selected:(Some "matcher.ml"));
 
   assert_true "ASCII display width uses one column per character"
     (Ofzf.Text_width.display_width "matcher" = 7);
@@ -362,10 +394,10 @@ let () =
 
   assert_equal_string "status includes count and selection"
     "3 matches · 2/3 selected · ↑/↓ move · Enter select · Esc cancel"
-    (Ofzf.Interactive.format_status ~result_count:3 ~selected:1);
+    (Ofzf.Interactive.format_status ~preview:false ~result_count:3 ~selected:1);
   assert_equal_string "status handles no results"
     "0 matches · no selection · ↑/↓ move · Enter select · Esc cancel"
-    (Ofzf.Interactive.format_status ~result_count:0 ~selected:0);
+    (Ofzf.Interactive.format_status ~preview:false ~result_count:0 ~selected:0);
   assert_equal_string "empty results message includes query"
     "(no matches for \"zzz\")"
     (Ofzf.Interactive.empty_results_message ~query:"zzz");
@@ -444,6 +476,30 @@ let () =
       "0 matches · no selection · ↑/↓ move · Enter select · Esc cancel";
       "(no matches for \"zzz\")" ]
     empty_lines;
+
+  let preview_lines =
+    Ofzf.Interactive.render_lines ~terminal_height:8 ~terminal_width:80 ~preview:true
+      ~preview_position:Ofzf.Preview.Right ~query:"mat" ~selected:0
+      [ highlight_result ]
+  in
+  assert_contains "interactive preview status marks preview" ~needle:"preview"
+    (List.nth preview_lines 1);
+  assert_true "interactive preview renders border or candidate"
+    (List.exists (contains_substring ~needle:"preview:") preview_lines);
+  let bottom_preview_lines =
+    Ofzf.Interactive.render_lines ~terminal_height:12 ~terminal_width:80 ~preview:true
+      ~preview_position:Ofzf.Preview.Bottom ~query:"mat" ~selected:0
+      [ highlight_result ]
+  in
+  assert_true "bottom preview includes preview pane"
+    (List.exists (contains_substring ~needle:"preview:") bottom_preview_lines);
+  let empty_preview_lines =
+    Ofzf.Interactive.render_lines ~terminal_height:8 ~terminal_width:80 ~preview:true
+      ~query:"zzz" ~selected:0 []
+  in
+  assert_true "empty preview shows no selected message"
+    (List.exists (contains_substring ~needle:"no selected result") empty_preview_lines);
+
   let none_selected, none_code = Ofzf.Interactive.selected_result ~selected:0 [] in
   assert_true "enter with no result has no selected output" (none_selected = None);
   assert_true "enter with no result exits non-zero" (none_code = 1);

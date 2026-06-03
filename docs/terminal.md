@@ -110,3 +110,7 @@ practical.
 The terminal layer still owns raw mode, alternate-screen handling, key decoding,
 and ANSI primitives. Unicode width policy lives in `Text_width`, and the UI
 composition logic lives in `Interactive`.
+
+## Preview rendering
+
+Preview rendering uses the same ANSI-only terminal approach as the result list. The terminal layer provides primitives; `Interactive` and `Preview` decide layout, borders, clipping, and selected-candidate content. No ncurses or external UI dependency is introduced.

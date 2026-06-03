@@ -35,3 +35,7 @@ cursor-side portion of the query visible where practical.
 
 Future navigation polish can add left/right cursor movement, Delete, Home/End,
 Page Up/Page Down, and grapheme-aware editing on top of the text-width helpers.
+
+## Preview interaction
+
+Query editing behavior is unchanged when preview is enabled. Each query edit recomputes results through the search engine, clamps selection, and refreshes the preview pane from the selected candidate.

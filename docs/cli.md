@@ -136,3 +136,15 @@ for the same query and input.
 Non-interactive CLI output is unchanged: matching lines are printed exactly as
 provided on stdin. Width-aware clipping is only used by interactive rendering so
 scripts and pipelines do not observe altered candidate text.
+
+## Preview options
+
+Interactive preview mode is available with `--preview`. The preview shows the selected candidate itself as text.
+
+```sh
+cat input.txt | ofzf --preview
+cat input.txt | ofzf --preview --preview-position right
+cat input.txt | ofzf --preview --preview-position bottom mat
+```
+
+`--preview-position` accepts `right` or `bottom`. Invalid values exit non-zero with a clear message. External preview commands are intentionally out of scope for v0.11.
