@@ -1,21 +1,20 @@
 DUNE ?= dune
 
+ifeq ($(shell uname -s),Darwin)
+DUNE_ENV = PATH="/usr/bin:/bin:/usr/sbin:/sbin:$$PATH" SDKROOT="$$(xcrun --sdk macosx --show-sdk-path)"
+else
+DUNE_ENV =
+endif
+
 .PHONY: build build-macos test clean
 
 build:
-	$(DUNE) build
+	$(DUNE_ENV) $(DUNE) build
 
-build-macos:
-	@if [ "$$(uname -s)" = "Darwin" ]; then \
-		PATH="/usr/bin:/bin:/usr/sbin:/sbin:$$PATH" \
-		SDKROOT="$$(xcrun --sdk macosx --show-sdk-path)" \
-		$(DUNE) build; \
-	else \
-		$(DUNE) build; \
-	fi
+build-macos: build
 
 test:
-	$(DUNE) runtest
+	$(DUNE_ENV) $(DUNE) runtest
 
 clean:
 	$(DUNE) clean
