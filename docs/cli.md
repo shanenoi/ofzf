@@ -130,3 +130,9 @@ Both paths use the same ordering:
 
 Therefore, `ofzf --limit K QUERY` returns the same ordered prefix as full ranking
 for the same query and input.
+
+## Unicode rendering note
+
+Non-interactive CLI output is unchanged: matching lines are printed exactly as
+provided on stdin. Width-aware clipping is only used by interactive rendering so
+scripts and pipelines do not observe altered candidate text.

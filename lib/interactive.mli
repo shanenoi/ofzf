@@ -10,7 +10,11 @@ val visible_window : selected:int -> terminal_height:int -> result_count:int -> 
 (** Return [(start, stop)] bounds for visible result rows. [stop] is exclusive. *)
 
 val clip_plain : terminal_width:int -> string -> string
-(** Clip a plain, non-ANSI string to the visible terminal width. *)
+(** Clip a plain, non-ANSI string to the visible terminal display width. *)
+
+val render_prompt :
+  cursor_byte:int -> terminal_width:int -> query:string -> Text_width.prompt_view
+(** Render the prompt and query using display-width-aware clipping. *)
 
 val delete_previous_word : string -> string
 (** Query-editing helper for Ctrl-W. *)

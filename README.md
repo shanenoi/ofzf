@@ -13,7 +13,7 @@ original non-interactive fuzzy-filter behavior.
 
 ## Current status
 
-Implemented through v0.8 terminal interaction hardening:
+Implemented through v0.10 Unicode + text-width correctness:
 
 - Case-insensitive subsequence fuzzy matching.
 - Match positions for future highlighting.
@@ -40,6 +40,11 @@ Implemented through v0.8 terminal interaction hardening:
   handling.
 - Selection clamping and viewport recalculation after result shrink or terminal
   resize checks.
+- Width-aware text helpers for safer interactive rendering of ASCII, tabs,
+  basic UTF-8, combining marks, wide CJK characters, emoji fallback ranges, and
+  invalid UTF-8 bytes.
+- Display-width clipping for prompts and result rows so interactive rendering no
+  longer clips by byte length or splits UTF-8 sequences where practical.
 - CLI entry point that filters stdin using the query argument.
 - Unit tests for matcher, scoring, ranking, top-k, CLI parsing, and pure
   interactive helpers.

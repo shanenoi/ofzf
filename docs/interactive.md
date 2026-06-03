@@ -147,3 +147,17 @@ cache eviction, and background indexing.
 - Resize handling is redraw-driven rather than signal-driven.
 - Query editing is byte-based rather than grapheme-aware.
 - Highlighting is byte-position-based, matching the current matcher API.
+
+## Unicode and display width
+
+Interactive rendering now goes through `Text_width` before rows are written.
+Prompt text and result rows are clipped by terminal display columns rather than
+by OCaml byte length. This matters for filenames containing tabs, accents,
+combining marks, CJK characters, emoji, or invalid UTF-8 bytes.
+
+ANSI styling is applied after width clipping. The renderer therefore does not
+count highlight or inverse-video escape bytes as visible columns. Matcher
+positions are still byte indexes, but highlighted cells are chosen by checking
+whether a matched byte falls inside each decoded display cell. ASCII candidates
+keep the exact behavior from earlier versions, while UTF-8 candidates render
+without cutting inside a character where practical.

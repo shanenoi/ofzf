@@ -23,9 +23,10 @@ let visible_window ~selected ~terminal_height ~result_count =
     (start, stop)
 
 let clip_plain ~terminal_width text =
-  if terminal_width <= 0 then ""
-  else if String.length text <= terminal_width then text
-  else String.sub text 0 terminal_width
+  Text_width.clip ~width:terminal_width text
+
+let render_prompt ~cursor_byte ~terminal_width ~query =
+  Text_width.prompt_view ~terminal_width ~cursor_byte query
 
 let is_query_word_separator = function
   | ' ' | '\t' | '\r' | '\n' -> true
@@ -80,33 +81,50 @@ let empty_results_message ~query =
 let is_position positions index =
   List.exists (( = ) index) positions
 
+let is_cell_position positions cell =
+  List.exists
+    (fun position -> position >= cell.Text_width.byte_start && position < cell.byte_end)
+    positions
+
 let render_candidate ~selected ~positions ~candidate =
   let buffer = Buffer.create (String.length candidate + (List.length positions * 16)) in
-  String.iteri
-    (fun index char ->
-      if is_position positions index then (
-        Buffer.add_string buffer Terminal.highlight;
-        Buffer.add_char buffer char;
-        Buffer.add_string buffer
-          (if selected then Terminal.selected_end_highlight else Terminal.end_highlight))
-      else Buffer.add_char buffer char)
-    candidate;
+  Text_width.cells candidate
+  |> List.iter (fun cell ->
+         if is_cell_position positions cell then (
+           Buffer.add_string buffer Terminal.highlight;
+           Buffer.add_string buffer cell.text;
+           Buffer.add_string buffer
+             (if selected then Terminal.selected_end_highlight else Terminal.end_highlight))
+         else Buffer.add_string buffer cell.text);
   Buffer.contents buffer
 
 let render_candidate_clipped ~terminal_width ~selected ~positions ~candidate =
   if terminal_width <= 0 then ""
   else
-    let visible = min terminal_width (String.length candidate) in
-    let buffer = Buffer.create (visible + (List.length positions * 16)) in
-    for index = 0 to visible - 1 do
-      let char = candidate.[index] in
-      if is_position positions index then (
-        Buffer.add_string buffer Terminal.highlight;
-        Buffer.add_char buffer char;
-        Buffer.add_string buffer
-          (if selected then Terminal.selected_end_highlight else Terminal.end_highlight))
-      else Buffer.add_char buffer char
-    done;
+    let buffer = Buffer.create (min terminal_width (String.length candidate) + (List.length positions * 16)) in
+    let rec loop used = function
+      | [] -> ()
+      | cell :: rest ->
+          let next_used = used + cell.Text_width.width in
+          if cell.width = 0 then (
+            if is_cell_position positions cell then (
+              Buffer.add_string buffer Terminal.highlight;
+              Buffer.add_string buffer cell.text;
+              Buffer.add_string buffer
+                (if selected then Terminal.selected_end_highlight else Terminal.end_highlight))
+            else Buffer.add_string buffer cell.text;
+            loop used rest)
+          else if next_used <= terminal_width then (
+            if is_cell_position positions cell then (
+              Buffer.add_string buffer Terminal.highlight;
+              Buffer.add_string buffer cell.text;
+              Buffer.add_string buffer
+                (if selected then Terminal.selected_end_highlight else Terminal.end_highlight))
+            else Buffer.add_string buffer cell.text;
+            loop next_used rest)
+          else ()
+    in
+    loop 0 (Text_width.cells candidate);
     Buffer.contents buffer
 
 let render_result_line ?terminal_width ~selected (result : Matcher.match_result) =
@@ -178,8 +196,14 @@ let render_lines ?terminal_width ~terminal_height ~query ~selected results =
         |> List.map (fun (index, result) ->
                render_result_line ?terminal_width ~selected:(index = selected) result)
     in
+    let prompt_line =
+      match terminal_width with
+      | None -> "> " ^ Text_width.sanitize query
+      | Some terminal_width ->
+          (render_prompt ~cursor_byte:(String.length query) ~terminal_width ~query).Text_width.visible
+    in
     let lines =
-      clip_line ("> " ^ query)
+      prompt_line
       :: clip_line (format_status ~result_count ~selected)
       :: body
     in
@@ -194,12 +218,17 @@ let render_line handle line = Terminal.write handle (line ^ "\n")
 
 let render handle state =
   let terminal_size = Terminal.terminal_size () in
+  let prompt =
+    render_prompt ~cursor_byte:(String.length state.query)
+      ~terminal_width:terminal_size.cols ~query:state.query
+  in
   Terminal.move_cursor handle ~row:1 ~col:1;
   Terminal.clear_screen handle;
   Terminal.move_cursor handle ~row:1 ~col:1;
   render_lines ~terminal_height:terminal_size.rows ~terminal_width:terminal_size.cols
     ~query:state.query ~selected:state.selected state.results
-  |> List.iter (render_line handle)
+  |> List.iter (render_line handle);
+  Terminal.move_cursor handle ~row:1 ~col:(prompt.cursor_col + 1)
 
 let cleanup handle =
   (try

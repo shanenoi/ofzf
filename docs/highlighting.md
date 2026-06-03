@@ -75,3 +75,18 @@ Future versions can store positions in arrays or a byte mask to make rendering
 - Control characters in candidates are not specially escaped yet.
 - Highlighting is applied only in interactive mode.
 - Clipping is based on byte count, not terminal cell width.
+
+## UTF-8 and clipped highlights
+
+Matcher positions are byte indexes. For ASCII this maps one-to-one with terminal
+characters. For UTF-8 text, the renderer decodes candidates into display cells
+before applying styling. A cell is highlighted when a match byte falls inside
+that cell.
+
+Clipping happens before ANSI styling and uses display width. This prevents a
+highlighted wide character from being split by byte length and prevents hidden
+matches outside the clipped range from emitting stray ANSI sequences.
+
+Selected rows still wrap the full visible row in inverse video. When a matched
+cell appears inside a selected row, the match style is closed with a sequence
+that restores inverse video so selection remains readable.

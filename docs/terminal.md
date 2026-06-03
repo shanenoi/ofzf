@@ -99,3 +99,14 @@ layout. Non-interactive output is not clipped.
 - No mouse input.
 - No UTF-8-aware editing; Backspace removes one byte.
 - No async input or background indexing.
+
+## Unicode-safe width helpers
+
+Terminal columns are not the same as string bytes. Interactive rendering now uses
+`Text_width` to estimate visible display columns, sanitize invalid UTF-8, and
+clip prompt/result text without cutting through decoded UTF-8 cells where
+practical.
+
+The terminal layer still owns raw mode, alternate-screen handling, key decoding,
+and ANSI primitives. Unicode width policy lives in `Text_width`, and the UI
+composition logic lives in `Interactive`.

@@ -222,6 +222,49 @@ let () =
   assert_true "terminal size normalization falls back for bad cols"
     (normalized.cols = 100);
 
+  assert_true "ASCII display width uses one column per character"
+    (Ofzf.Text_width.display_width "matcher" = 7);
+  assert_true "tab display width uses configured tab width"
+    (Ofzf.Text_width.display_width "a\tb" = 6);
+  assert_true "basic UTF-8 display width is decoded safely"
+    (Ofzf.Text_width.display_width "café" = 4);
+  assert_true "combining marks are zero-width where practical"
+    (Ofzf.Text_width.display_width "e\204\129" = 1);
+  assert_true "wide CJK characters use two columns"
+    (Ofzf.Text_width.display_width "界" = 2);
+  assert_true "emoji fallback uses two columns"
+    (Ofzf.Text_width.display_width "😀" = 2);
+  assert_equal_string "invalid UTF-8 is represented safely" "�"
+    (Ofzf.Text_width.sanitize "\192");
+  assert_equal_string "width clipping keeps whole UTF-8 characters" "é"
+    (Ofzf.Text_width.clip ~width:1 "éx");
+  assert_equal_string "too-narrow clipping omits wide characters" ""
+    (Ofzf.Text_width.clip ~width:1 "界x");
+  assert_equal_string "wide character clipping includes full glyph" "界"
+    (Ofzf.Text_width.clip ~width:2 "界x");
+  assert_true "display width until byte respects decoded cells"
+    (Ofzf.Text_width.display_width_until_byte ~byte_index:(String.length "a界")
+       "a界b"
+    = 3);
+  assert_true "byte index for display column returns UTF-8 boundary"
+    (Ofzf.Text_width.byte_index_for_display_column ~column:2 "a界b" = 1);
+
+  let prompt_view =
+    Ofzf.Interactive.render_prompt ~cursor_byte:(String.length "abcdef")
+      ~terminal_width:6 ~query:"abcdef"
+  in
+  assert_equal_string "long prompt keeps cursor-side query text visible" "> cdef"
+    prompt_view.visible;
+  assert_true "long prompt cursor column stays within terminal width"
+    (prompt_view.cursor_col = 5);
+  let utf8_prompt =
+    Ofzf.Interactive.render_prompt ~cursor_byte:(String.length "a界b")
+      ~terminal_width:20 ~query:"a界b"
+  in
+  assert_equal_string "UTF-8 prompt renders safely" "> a界b" utf8_prompt.visible;
+  assert_true "UTF-8 prompt cursor column uses display width"
+    (utf8_prompt.cursor_col = 6);
+
   assert_true "interactive result rows leaves room for prompt"
     (Ofzf.Interactive.result_rows ~terminal_height:20 = 18);
   assert_true "interactive result rows handles tiny terminals"
@@ -360,6 +403,26 @@ let () =
   assert_true "clipped selected row resets styling"
     (ends_with ~suffix:Ofzf.Terminal.reset clipped_selected_line);
 
+  let unicode_result =
+    Ofzf.Matcher.{ candidate = "a界b"; positions = [ 0; String.length "a界" ]; score = 0 }
+  in
+  let unicode_clipped =
+    Ofzf.Interactive.render_candidate_clipped ~terminal_width:3 ~selected:false
+      ~positions:unicode_result.positions ~candidate:unicode_result.candidate
+  in
+  assert_contains "UTF-8 clipped row keeps whole visible glyph" ~needle:"界"
+    unicode_clipped;
+  assert_not_contains "UTF-8 clipped row omits hidden match" ~needle:"b"
+    unicode_clipped;
+  let unicode_selected =
+    Ofzf.Interactive.render_result_line ~terminal_width:4 ~selected:true
+      unicode_result
+  in
+  assert_true "UTF-8 selected clipped row starts inverse"
+    (starts_with ~prefix:Ofzf.Terminal.inverse unicode_selected);
+  assert_true "UTF-8 selected clipped row resets styling"
+    (ends_with ~suffix:Ofzf.Terminal.reset unicode_selected);
+
   let render_lines =
     Ofzf.Interactive.render_lines ~terminal_height:4 ~query:"mat" ~selected:1
       [ require_match "mat" "matcher.ml"; require_match "mat" "src/matcher.ml" ]
@@ -371,7 +434,7 @@ let () =
     Ofzf.Interactive.render_lines ~terminal_height:3 ~terminal_width:5
       ~query:"matcher" ~selected:0 [ highlight_result ]
   in
-  assert_equal_string "prompt is clipped to terminal width" "> mat"
+  assert_equal_string "prompt is clipped to terminal width" "> her"
     (List.hd clipped_lines);
   let empty_lines =
     Ofzf.Interactive.render_lines ~terminal_height:3 ~query:"zzz" ~selected:0 []

@@ -81,3 +81,20 @@ result range:
   characters are not escaped yet.
 - No preview windows, multi-select, mouse support, async indexing, background
   workers, or shell integration.
+
+## v0.10 width hardening
+
+The v0.8 clipping path used byte length as a proxy for terminal width. v0.10
+replaces that with display-width clipping for the prompt and result rows.
+
+The new behavior:
+
+- clips by estimated terminal columns;
+- does not count ANSI styling bytes as visible width;
+- avoids splitting valid UTF-8 byte sequences where practical;
+- replaces invalid UTF-8 with `�` rather than emitting broken bytes;
+- keeps highlighted match cells readable inside selected rows.
+
+This remains a pragmatic implementation. It is not a complete Unicode
+`wcwidth`/grapheme engine, but it is safer for real-world filenames than byte
+clipping.

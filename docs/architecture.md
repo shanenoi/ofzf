@@ -129,10 +129,26 @@ exists.
 Using `/dev/tty` lets stdin remain the candidate stream and stdout remain the
 selected result stream.
 
+### Text-width library
+
+`lib/text_width.ml` owns display-width calculations for interactive rendering:
+
+- safe UTF-8 decoding with invalid-byte replacement;
+- ASCII and tab width handling;
+- zero-width handling for common combining marks;
+- double-width handling for common East Asian and emoji ranges;
+- width-aware clipping that avoids splitting UTF-8 cells;
+- prompt views that keep the cursor-side query text visible where practical.
+
+The matcher still reports byte positions. The interactive renderer maps those
+positions onto decoded text cells before adding ANSI highlight sequences, so
+ASCII matching behavior remains unchanged while non-ASCII candidates render
+safely.
+
 ### Interactive UI
 
 `lib/interactive.ml` owns query editing, selection movement, visible-window
-calculation, width clipping, highlighted rendering, and terminal cleanup. It
+calculation, display-width clipping, highlighted rendering, and terminal cleanup. It
 uses the existing incremental search engine whenever the query changes, then
 renders only the visible result window. Normal rows highlight matched characters
 from matcher positions; the selected row combines inverse video with
@@ -159,6 +175,8 @@ For `m` candidates, total input size `N`, query length `q`, and `k` matches:
 - incremental prefix searches scan `O(p)` candidate bytes where `p` is the
   previous matching subset size;
 - exact cache hits skip matching and only re-rank cached candidates.
+- interactive clipping is `O(r)` in the visible rendered bytes/cells for the
+  current prompt and result rows, not in the full result set.
 
 The top-k implementation avoids allocating a full sorted result list when a
 caller only needs the best `K` candidates. A future heap can reduce the top-k
