@@ -7,6 +7,7 @@ text.
 ```sh
 cat input.txt | ofzf QUERY
 cat input.txt | ofzf --limit N QUERY
+cat input.txt | ofzf --bench QUERY
 ```
 
 No terminal UI, raw mode, ncurses, preview window, or multi-select behavior is
@@ -19,6 +20,7 @@ Supported forms:
 - `ofzf QUERY` performs full ranking and prints every matching line.
 - `ofzf --limit N QUERY` performs bounded top-k ranking and prints at most `N`
   matching lines.
+- `ofzf --bench QUERY` prints benchmark and incremental-search statistics.
 
 Error behavior:
 
@@ -26,6 +28,23 @@ Error behavior:
 - invalid `--limit` prints a clear error to stderr and exits non-zero;
 - negative `--limit` prints a clear error to stderr and exits non-zero;
 - `--limit 0` prints nothing and exits successfully.
+
+## Benchmark mode
+
+`--bench QUERY` reads stdin into memory and compares the normal full-search path
+with a simulated incremental session. For query `matcher`, the benchmark path
+searches prefixes such as `m`, `ma`, `mat`, and so on until the full query. This
+exercises `Search_engine` and `Query_cache` without adding any interactive UI.
+
+Benchmark output includes:
+
+- query;
+- candidate count;
+- matched count;
+- full-search matching and ranking time;
+- cache hits and misses;
+- incremental reuse count;
+- candidate reduction ratio.
 
 ## Streaming design
 
@@ -49,6 +68,9 @@ For total input size `S`, matching count `m`, and limit `K`:
 - both paths stream over stdin once;
 - each retained result stores candidate text, match positions, score, and input
   index.
+
+Benchmark mode is intentionally not streaming because it must run full and
+incremental comparisons over the same candidate list.
 
 ## Full ranking vs limited ranking
 

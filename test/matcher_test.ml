@@ -134,11 +134,73 @@ let () =
     (take 3 full_rank) top_three;
 
   let open Ofzf.Cli in
-  assert_cli_ok "parse query" [ "ofzf"; "abc" ] { query = "abc"; limit = None };
+  assert_cli_ok "parse query" [ "ofzf"; "abc" ]
+    { query = "abc"; limit = None; mode = Search };
   assert_cli_ok "parse limit" [ "ofzf"; "--limit"; "2"; "abc" ]
-    { query = "abc"; limit = Some 2 };
+    { query = "abc"; limit = Some 2; mode = Search };
   assert_cli_ok "parse zero limit" [ "ofzf"; "--limit"; "0"; "abc" ]
-    { query = "abc"; limit = Some 0 };
+    { query = "abc"; limit = Some 0; mode = Search };
+  assert_cli_ok "parse bench" [ "ofzf"; "--bench"; "abc" ]
+    { query = "abc"; limit = None; mode = Bench };
+  assert_cli_ok "parse bench with limit" [ "ofzf"; "--bench"; "--limit"; "2"; "abc" ]
+    { query = "abc"; limit = Some 2; mode = Bench };
   assert_cli_error "missing query" [ "ofzf" ];
   assert_cli_error "invalid limit" [ "ofzf"; "--limit"; "wat"; "abc" ];
-  assert_cli_error "negative limit" [ "ofzf"; "--limit"; "-1"; "abc" ]
+  assert_cli_error "negative limit" [ "ofzf"; "--limit"; "-1"; "abc" ];
+
+  let cache = Ofzf.Query_cache.empty in
+  assert_true "cache miss" (Ofzf.Query_cache.find ~query:"mat" cache = None);
+  let cache = Ofzf.Query_cache.add ~query:"ma" ~results:[ "matcher.ml" ] cache in
+  assert_true "cache lookup"
+    (Ofzf.Query_cache.find ~query:"ma" cache = Some [ "matcher.ml" ]);
+  assert_true "prefix relationship"
+    (Ofzf.Query_cache.is_prefix ~prefix:"ma" ~query:"mat");
+  assert_true "non-prefix relationship rejected"
+    (not (Ofzf.Query_cache.is_prefix ~prefix:"mt" ~query:"mat"));
+
+  let candidates =
+    [ "matcher.ml"; "src/matcher.ml"; "scoring.ml"; "README.md"; "mat" ]
+  in
+  let full = Ofzf.Search_engine.full_search ~query:"mat" candidates in
+  assert_equal_string_list "full search correctness"
+    (ranked_candidates "mat" candidates)
+    (List.map (fun result -> result.Ofzf.Matcher.candidate) full.results);
+  assert_true "full search scans all candidates"
+    (full.stats.candidate_count_scanned = List.length candidates);
+  assert_true "full search records cache miss" (full.stats.cache_misses = 1);
+
+  let first =
+    Ofzf.Search_engine.incremental_search
+      ~context:Ofzf.Search_engine.empty_context ~query:"m" candidates
+  in
+  let second =
+    Ofzf.Search_engine.incremental_search ~context:first.context ~query:"ma"
+      candidates
+  in
+  let third =
+    Ofzf.Search_engine.incremental_search ~context:second.context ~query:"mat"
+      candidates
+  in
+  assert_true "incremental reuse recorded"
+    (third.stats.incremental_reuse_count >= 2);
+  assert_true "incremental scans subset"
+    (third.stats.candidate_count_scanned <= List.length candidates);
+  assert_equal_string_list "incremental ranking consistency"
+    (ranked_candidates "mat" candidates)
+    (List.map (fun result -> result.Ofzf.Matcher.candidate) third.results);
+
+  let fallback =
+    Ofzf.Search_engine.incremental_search ~context:third.context ~query:"sc"
+      candidates
+  in
+  assert_true "fallback scans full input"
+    (fallback.stats.candidate_count_scanned = List.length candidates);
+  assert_true "fallback records cache miss" (fallback.stats.cache_misses >= 1);
+
+  let repeated =
+    Ofzf.Search_engine.incremental_search ~context:third.context ~query:"mat"
+      candidates
+  in
+  assert_true "exact query cache hit" (repeated.stats.cache_hits >= 1);
+  assert_true "cache hit scans no candidates"
+    (repeated.stats.candidate_count_scanned = 0)

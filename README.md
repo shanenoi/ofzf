@@ -12,7 +12,7 @@ The first milestone is intentionally simple: a non-interactive fuzzy filter that
 
 ## Current status
 
-Implemented through v0.4 streaming input and top-k CLI:
+Implemented through v0.5 incremental query engine:
 
 - Case-insensitive subsequence fuzzy matching.
 - Match positions for future highlighting.
@@ -21,7 +21,10 @@ Implemented through v0.4 streaming input and top-k CLI:
 - Top-k ranking support without fully sorting all matches.
 - Streaming CLI that processes stdin line-by-line.
 - `--limit N` for bounded top-k output.
-- Benchmark executable comparing full ranking and top-k ranking time.
+- Query cache and incremental search engine for future interactive narrowing.
+- Statistics for scanned candidates, matches, cache hit/miss, and reuse counts.
+- `--bench QUERY` CLI mode for full vs incremental measurements.
+- Benchmark executable comparing full and incremental ranking behavior.
 - CLI entry point that filters stdin using the query argument.
 - Unit tests for matcher, scoring, ranking, and top-k behavior.
 
@@ -53,6 +56,10 @@ dune exec ofzf -- --limit 20 query < candidates.txt
 ```
 
 ```sh
+dune exec ofzf -- --bench query < candidates.txt
+```
+
+```sh
 dune runtest
 ```
 
@@ -62,5 +69,6 @@ dune runtest
 dune exec bench/benchmark.exe -- --limit 20 mat < candidates.txt
 ```
 
-The benchmark prints candidate count, query length, limit, matching time, full
-ranking time, top-k ranking time, and result counts.
+The benchmark prints candidate count, query length, limit, full-search timing,
+incremental timing, candidate reduction ratio, cache hits/misses, and reuse
+counts.

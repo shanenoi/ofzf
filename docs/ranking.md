@@ -65,8 +65,20 @@ candidate may rank above an earlier one. It still avoids storing non-matches.
 The `--limit` path keeps only the best `K` matches at any time. This is the
 scalable path for large streams when callers only need a short ranked prefix.
 
+## Incremental engine interaction
+
+v0.5 adds `Search_engine` above ranking. The engine can narrow a new query from
+a cached or previous matching subset when the new query extends an older query.
+Ranking correctness does not change: after the smaller search space is matched,
+results still use the same scoring and stable ordering rules as full ranking.
+
+`--bench QUERY` uses this layer to compare full search against a simulated
+incremental session over the query prefixes. Normal `ofzf QUERY` and
+`ofzf --limit N QUERY` keep the streaming CLI behavior from v0.4.
+
 ## Not implemented yet
 
-Ranking optimization does not add terminal UI, raw mode, preview windows, or
-multi-select. Those features should be built on top of `Matcher.rank_top` after
-the ranking engine is stable.
+Ranking optimization and incremental search do not add terminal UI, raw mode,
+preview windows, or multi-select. Those features should be built on top of
+`Matcher.rank_top` and `Search_engine.incremental_search` after the core is
+stable.
