@@ -10,8 +10,8 @@ cat input.txt | ofzf --bench QUERY
 cat input.txt | ofzf
 ```
 
-No ncurses, preview window, multi-select behavior, mouse support, background
-indexing, or shell integration is implemented in this milestone.
+No ncurses, multi-select behavior, mouse support, background indexing, or shell
+integration is implemented in this milestone.
 
 ## Argument handling
 
@@ -54,6 +54,7 @@ Supported keys:
 - Ctrl-U clears the query;
 - Ctrl-W deletes the previous whitespace-delimited query word;
 - Arrow Up/Down moves the selected row;
+- Page Up/Page Down moves the selected row by a visible page where supported;
 - Enter prints the selected candidate to stdout and exits successfully;
 - Escape exits non-zero;
 - Ctrl-C exits non-zero.
@@ -139,7 +140,10 @@ scripts and pipelines do not observe altered candidate text.
 
 ## Preview options
 
-Interactive preview mode is available with `--preview`. The preview shows the selected candidate itself as text.
+Interactive preview mode is available with `--preview`. If the selected
+candidate is a readable regular file path, the preview shows file contents.
+Otherwise it shows a clear fallback for directories, missing paths, unreadable
+paths, binary-looking files, or plain text candidate values.
 
 ```sh
 cat input.txt | ofzf --preview
@@ -147,4 +151,13 @@ cat input.txt | ofzf --preview --preview-position right
 cat input.txt | ofzf --preview --preview-position bottom mat
 ```
 
-`--preview-position` accepts `right` or `bottom`. Invalid values exit non-zero with a clear message. External preview commands are intentionally out of scope for v0.11.
+`--preview-position` accepts `right` or `bottom`. Invalid values exit non-zero
+with a clear message. External preview commands, shell expansion, and `{}`
+placeholder expansion are intentionally out of scope for v0.12.
+
+Preview scrolling keys:
+
+- Alt-Up or Ctrl-Y scrolls one preview line up;
+- Alt-Down or Ctrl-E scrolls one preview line down;
+- Ctrl-B scrolls one preview page up;
+- Ctrl-F scrolls one preview page down.

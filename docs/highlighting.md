@@ -94,3 +94,10 @@ that restores inverse video so selection remains readable.
 ## Preview interaction
 
 Preview mode does not change result highlighting. Match highlighting remains confined to result rows, while preview content is plain selected-candidate text clipped with `Text_width`.
+
+## Preview interaction
+
+Preview file content is not match-highlighted in v0.12. Match highlighting stays
+focused on result rows, while preview content is width-clipped plain text inside
+the bordered pane. This keeps selected-row inverse styling and file-preview
+rendering independent.

@@ -22,8 +22,11 @@ val delete_previous_word : string -> string
 val apply_key_to_query : Terminal.key -> query:string -> string
 (** Pure query editing helper. Non-editing keys leave the query unchanged. *)
 
-val apply_key_to_selection : Terminal.key -> selected:int -> result_count:int -> int
+val apply_key_to_selection : ?page_size:int -> Terminal.key -> selected:int -> result_count:int -> int
 (** Pure selection movement helper. *)
+
+val preview_scroll_delta : visible_rows:int -> Terminal.key -> int option
+(** Preview-scroll delta for keys that control the preview pane. *)
 
 val format_status : preview:bool -> result_count:int -> selected:int -> string
 (** Human-readable status line for the current result set. *)
@@ -42,13 +45,15 @@ val render_candidate_clipped :
 val render_result_line : ?terminal_width:int -> selected:bool -> Matcher.match_result -> string
 (** Render one result row, including selected-row styling when requested. *)
 
-val render_preview_pane : terminal_width:int -> selected:string option -> string list
+val render_preview_pane :
+  terminal_width:int -> height:int -> scroll:int -> selected:string option -> string list
 (** Pure preview-pane renderer used by tests. *)
 
 val render_lines :
   ?terminal_width:int ->
   ?preview:bool ->
   ?preview_position:Preview.position ->
+  ?preview_scroll:int ->
   terminal_height:int ->
   query:string ->
   selected:int ->
@@ -60,6 +65,10 @@ val render_lines :
 val selected_result : selected:int -> Matcher.match_result list -> (Matcher.match_result option * int)
 (** Enter-key result helper. Returns [(Some result, 0)] when a result exists and
     [(None, 1)] when Enter is pressed with no selectable result. *)
+
+val preview_visible_rows :
+  terminal_height:int -> terminal_width:int -> preview:bool -> preview_position:Preview.position -> int
+(** Number of scrollable preview content rows for the current terminal layout. *)
 
 val run : preview:bool -> preview_position:Preview.position -> initial_query:string -> candidates:string list -> int
 (** Run interactive mode. Returns the intended process exit code. *)

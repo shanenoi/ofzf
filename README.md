@@ -13,7 +13,7 @@ original non-interactive fuzzy-filter behavior.
 
 ## Current status
 
-Implemented through v0.11 Preview Window Foundation:
+Implemented through v0.12 Preview File Content + Preview Scrolling:
 
 - Case-insensitive subsequence fuzzy matching.
 - Match positions for future highlighting.
@@ -46,7 +46,11 @@ Implemented through v0.11 Preview Window Foundation:
 - Display-width clipping for prompts and result rows so interactive rendering no
   longer clips by byte length or splits UTF-8 sequences where practical.
 - Optional interactive preview foundation with right-side or bottom layouts.
-- `--preview` previews the selected candidate itself without executing commands.
+- `--preview` previews readable regular files, or falls back to selected
+  candidate text for non-path candidates, without executing commands.
+- Preview panes classify directories, missing paths, unreadable files, and
+  binary-looking files with clear messages.
+- Preview scrolling supports Alt-Up/Alt-Down, Ctrl-Y/Ctrl-E, and Ctrl-B/Ctrl-F.
 - CLI entry point that filters stdin using the query argument.
 - Unit tests for matcher, scoring, ranking, top-k, CLI parsing, and pure
   interactive helpers.
@@ -105,6 +109,10 @@ dune exec ofzf -- < candidates.txt
 ```sh
 dune exec ofzf -- --preview --preview-position right < candidates.txt
 ```
+
+With preview enabled, if a selected candidate is a readable regular file path,
+the preview pane shows file contents. It never executes the selected candidate
+as a command.
 
 ```sh
 make test

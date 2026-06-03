@@ -49,12 +49,16 @@ Raw key input is byte-oriented. The current MVP decodes:
 - printable character bytes as `Character c`;
 - `\r` and `\n` as Enter;
 - `\b` and DEL as Backspace;
+- Ctrl-B/Ctrl-F as preview page up/down;
+- Ctrl-E/Ctrl-Y as preview line down/up;
 - Ctrl-U as `Ctrl_u`;
 - Ctrl-W as `Ctrl_w`;
 - Ctrl-C as `Ctrl_c`;
 - bare Escape as `Escape`;
 - `ESC [ A` as Arrow Up;
-- `ESC [ B` as Arrow Down.
+- `ESC [ B` as Arrow Down;
+- `ESC [ 5 ~` / `ESC [ 6 ~` as Page Up / Page Down;
+- common Alt-Up / Alt-Down sequences where practical.
 
 Escape sequences are read with a short timeout after the initial Escape byte so
 a plain Escape key can still be recognized. Unsupported escape sequences become
@@ -114,3 +118,17 @@ composition logic lives in `Interactive`.
 ## Preview rendering
 
 Preview rendering uses the same ANSI-only terminal approach as the result list. The terminal layer provides primitives; `Interactive` and `Preview` decide layout, borders, clipping, and selected-candidate content. No ncurses or external UI dependency is introduced.
+
+## Preview scrolling keys
+
+The terminal parser recognizes the preview-scroll controls used by interactive
+mode:
+
+- Alt-Up / Alt-Down for preview line movement where terminals send common
+  `ESC [1;3A/B` sequences;
+- Ctrl-Y / Ctrl-E for preview line up/down;
+- Ctrl-B / Ctrl-F for preview page up/down;
+- Page Up / Page Down for result-list page navigation.
+
+Unsupported escape sequences still become `Unknown` and are ignored by the
+query editor so control bytes do not corrupt the query.

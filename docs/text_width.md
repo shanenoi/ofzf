@@ -79,3 +79,10 @@ implementation while preserving the public helper API.
 ## Preview clipping
 
 Preview content uses the same width-aware clipping helpers as result rows and prompts. This keeps long selected candidates from overflowing the preview pane and avoids cutting inside decoded UTF-8 cells where practical.
+
+## File-preview interaction
+
+File preview lines use the same display-width clipping path as interactive
+result rows and prompts. The preview loader normalizes CRLF/LF line endings and
+passes each line through `Text_width.clip`, so long file lines and Unicode paths
+stay within the preview pane without byte-length clipping.

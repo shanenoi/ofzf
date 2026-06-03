@@ -1,13 +1,21 @@
 type key =
   | Character of char
   | Backspace
+  | Ctrl_b
+  | Ctrl_e
+  | Ctrl_f
   | Ctrl_u
   | Ctrl_w
+  | Ctrl_y
   | Ctrl_c
   | Enter
   | Escape
   | Arrow_up
   | Arrow_down
+  | Alt_up
+  | Alt_down
+  | Page_up
+  | Page_down
   | Unknown of string
 
 type size = { rows : int; cols : int }
@@ -34,14 +42,22 @@ let end_highlight = "\027[22;24m"
 let selected_end_highlight = "\027[22;24;7m"
 
 let parse_key_sequence = function
+  | "\002" -> Ctrl_b
   | "\003" -> Ctrl_c
+  | "\005" -> Ctrl_e
+  | "\006" -> Ctrl_f
   | "\021" -> Ctrl_u
   | "\023" -> Ctrl_w
+  | "\025" -> Ctrl_y
   | "\r" | "\n" -> Enter
   | "\b" | "\127" -> Backspace
   | "\027" -> Escape
   | "\027[A" -> Arrow_up
   | "\027[B" -> Arrow_down
+  | "\027\027[A" | "\027[1;3A" -> Alt_up
+  | "\027\027[B" | "\027[1;3B" -> Alt_down
+  | "\027[5~" -> Page_up
+  | "\027[6~" -> Page_down
   | sequence when String.length sequence = 1 -> Character sequence.[0]
   | sequence -> Unknown sequence
 

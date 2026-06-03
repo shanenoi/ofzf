@@ -1,9 +1,9 @@
 # Preview Window
 
-`ofzf` v0.11 adds the first preview-window foundation for interactive mode.
-The preview is intentionally simple and synchronous: it shows the currently
-selected candidate text. It does not execute external commands, expand shell
-syntax, or interpret `{}` placeholders yet.
+`ofzf` v0.12 extends the preview-window foundation with safe file-content
+preview and preview scrolling. The preview is intentionally synchronous and
+does not execute external commands, expand shell syntax, or interpret `{}`
+placeholders yet.
 
 ## CLI options
 
@@ -33,6 +33,21 @@ Right preview splits columns between results and preview. Bottom preview keeps
 full width and allocates lower rows to preview. Both leave the prompt and status
 lines stable at the top.
 
+## Content source
+
+The selected candidate is classified before rendering:
+
+- readable regular file: preview up to 256 KiB of file contents;
+- directory: show a directory message;
+- missing path: show a missing-path message;
+- unreadable path: show an unreadable-file message;
+- binary-looking file: omit raw bytes and show a binary message;
+- plain text: show the candidate text itself.
+
+The missing-path vs plain-text decision uses a conservative path heuristic. A
+nonexistent value with path separators, dots, or common relative/home prefixes is
+reported as a missing path; other values fall back to plain text preview.
+
 ## Rendering strategy
 
 The interactive renderer keeps ANSI styling local to terminal/UI code. Result
@@ -41,8 +56,24 @@ rows still use matcher positions for highlighting. Preview content uses
 columns rather than bytes.
 
 The current preview pane renders a small border where practical, a status/title
-line, and the selected candidate text. If no result is selected, it shows a
-helpful empty-preview message.
+line, and clipped preview lines. If no result is selected, it shows a helpful
+empty-preview message. Preview lines use `Text_width` clipping, so long Unicode
+text does not split UTF-8 cells where practical.
+
+## Scrolling
+
+Preview scroll state is independent from result selection. It resets when the
+selected candidate changes or when a query recomputation changes the selected
+candidate. The scroll offset is clamped to valid content bounds.
+
+| Key | Action |
+| --- | --- |
+| Alt-Up or Ctrl-Y | preview line up |
+| Alt-Down or Ctrl-E | preview line down |
+| Ctrl-B | preview page up |
+| Ctrl-F | preview page down |
+
+Page Up and Page Down remain result-list navigation keys.
 
 ## Why commands are not executed yet
 
@@ -53,7 +84,9 @@ controlled command model in a later milestone.
 
 ## Limitations
 
-- Preview content is the selected candidate text only.
+- Preview reads at most 256 KiB from a selected file.
+- Preview loading is synchronous.
+- Binary detection is heuristic.
 - No async preview execution.
 - No background workers.
 - No shell integration or placeholder expansion.

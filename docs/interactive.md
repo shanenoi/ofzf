@@ -167,3 +167,21 @@ without cutting inside a character where practical.
 When `--preview` is enabled, interactive mode asks `Preview.compute_layout` for result and preview bounds. The preview pane updates synchronously when selection or query changes and displays the selected candidate text. If there is no selection, it shows a no-selected-result message.
 
 Right-side preview is used by default. Bottom preview can be selected with `--preview-position bottom`. Tiny terminals hide preview rather than rendering past bounds.
+
+## v0.12 preview file content and scrolling
+
+When preview mode is enabled, the interactive loop now asks `Preview` to load a
+content record for the selected candidate. The selected candidate is previewed as
+file content only when it is a readable regular file. Directories, missing
+paths, unreadable paths, binary-looking files, and plain text candidates render
+explicit fallback messages/content.
+
+Preview scroll state is separate from result-list selection. Alt-Up/Ctrl-Y and
+Alt-Down/Ctrl-E scroll by one preview line. Ctrl-B and Ctrl-F scroll by one
+preview page. Page Up and Page Down remain result-list navigation keys. The
+scroll offset is clamped to the loaded content bounds and resets when the
+selected candidate changes or the query is recomputed.
+
+Preview rendering remains synchronous and ANSI-only. The current milestone still
+avoids async workers, arbitrary preview commands, shell expansion, and `{}`
+placeholder expansion.

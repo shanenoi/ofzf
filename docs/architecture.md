@@ -18,6 +18,7 @@ stdin candidates + no argv query
   -> Interactive loop
   -> Search_engine.incremental_search on query edits
   -> ANSI-rendered highlighted result window on /dev/tty
+  -> optional Preview content loading for selected candidates
   -> selected candidate on stdout
 
 bench mode:
@@ -154,6 +155,20 @@ renders only the visible result window. Normal rows highlight matched characters
 from matcher positions; the selected row combines inverse video with
 matched-character highlighting so both selection and relevance remain visible.
 
+When `--preview` is enabled, `Interactive` asks `Preview` for a layout and for
+content associated with the selected candidate. Preview scroll state is kept
+separate from result selection, resets when selection/query changes, and is
+clamped to the loaded content bounds.
+
+### Preview library
+
+`lib/preview.ml` owns preview layout, candidate classification, file-content
+loading, binary-looking detection, CRLF/LF normalization, and scroll helpers. It
+does not execute commands, invoke a shell, or expand placeholders. Regular files
+are read synchronously up to a conservative 256 KiB limit. Directories, missing
+paths, unreadable paths, binary-looking files, and plain-text candidates all
+produce explicit preview content records for the renderer.
+
 ## Ranking behavior
 
 Candidates that do not match are removed. Matching candidates are scored and
@@ -201,8 +216,8 @@ The architecture leaves room for fzf-style speed improvements:
 6. Parallelize scoring across chunks for non-streaming batch use cases.
 7. Improve terminal redraw minimality and add signal-driven resize handling.
 8. Cache pre-rendered candidate fragments for large interactive result sets.
-9. Add preview windows and multi-select only after the matching core is stable.
+9. Add command-based preview and multi-select only after the safe preview core is stable.
 
 ### Preview foundation
 
-`lib/preview.ml` owns pure preview layout calculations. Interactive mode can request no preview, right-side preview, or bottom preview. v0.11 previews the selected candidate text only; it deliberately does not execute shell commands or expand placeholders. Tiny terminals hide preview and keep the result list usable.
+`lib/preview.ml` owns pure preview layout calculations and safe preview-content helpers. Interactive mode can request no preview, right-side preview, or bottom preview. v0.12 previews readable regular file contents and falls back to clear messages/text for other selected candidates. It deliberately does not execute shell commands or expand placeholders. Tiny terminals hide preview and keep the result list usable.

@@ -5,6 +5,7 @@ type state = {
   selected : int;
   preview : bool;
   preview_position : Preview.position;
+  preview_scroll : int;
 }
 
 let header_rows = 2
@@ -59,11 +60,20 @@ let apply_key_to_query key ~query =
       query ^ String.make 1 char
   | _ -> query
 
-let apply_key_to_selection key ~selected ~result_count =
+let apply_key_to_selection ?(page_size = 10) key ~selected ~result_count =
   match key with
   | Terminal.Arrow_up -> clamp_selection ~selected:(selected - 1) ~result_count
   | Terminal.Arrow_down -> clamp_selection ~selected:(selected + 1) ~result_count
+  | Terminal.Page_up -> clamp_selection ~selected:(selected - max 1 page_size) ~result_count
+  | Terminal.Page_down -> clamp_selection ~selected:(selected + max 1 page_size) ~result_count
   | _ -> clamp_selection ~selected ~result_count
+
+let preview_scroll_delta ~visible_rows = function
+  | Terminal.Alt_up | Terminal.Ctrl_y -> Some (-1)
+  | Terminal.Alt_down | Terminal.Ctrl_e -> Some 1
+  | Terminal.Ctrl_b -> Some (-max 1 visible_rows)
+  | Terminal.Ctrl_f -> Some (max 1 visible_rows)
+  | _ -> None
 
 let format_status ~preview ~result_count ~selected =
   let selection =
@@ -156,6 +166,7 @@ let recompute candidates state query =
     context = search.context;
     results = search.results;
     selected = clamp_selection ~selected:state.selected ~result_count;
+    preview_scroll = 0;
   }
 
 let initial_state ?(preview = false) ?(preview_position = Preview.Right) ?(initial_query = "") candidates =
@@ -170,6 +181,7 @@ let initial_state ?(preview = false) ?(preview_position = Preview.Right) ?(initi
     selected = 0;
     preview;
     preview_position;
+    preview_scroll = 0;
   }
 
 let slice list start stop =
@@ -181,8 +193,9 @@ let slice list start stop =
   in
   loop 0 [] list
 
-let render_preview_pane ~terminal_width ~selected =
-  Preview.render_preview_lines ~terminal_width ~selected
+let render_preview_pane ~terminal_width ~height ~scroll ~selected =
+  Preview.content_for_selection ~max_bytes:Preview.max_preview_bytes selected
+  |> Preview.render_content_lines ~terminal_width ~height ~scroll
 
 let selected_candidate_text ~selected results =
   match fst (selected_result ~selected results) with
@@ -192,11 +205,14 @@ let selected_candidate_text ~selected results =
 let border_line width =
   if width <= 0 then "" else String.make width '-'
 
-let render_preview_box ~width ~height ~selected =
+let render_preview_box ~width ~height ~scroll ~selected =
   if height <= 0 || width <= 0 then []
   else
     let content_width = max 0 (width - 2) in
-    let content = render_preview_pane ~terminal_width:content_width ~selected in
+    let content =
+      render_preview_pane ~terminal_width:content_width ~height:(max 0 (height - 2))
+        ~scroll ~selected
+    in
     let pad line =
       let clipped = Text_width.clip ~width:content_width line in
       let pad_width = max 0 (content_width - Text_width.display_width clipped) in
@@ -215,7 +231,7 @@ let render_preview_box ~width ~height ~selected =
     if height = 1 then [ Text_width.clip ~width top ]
     else top :: take_fill body_rows [] content @ [ bottom ]
 
-let render_lines ?terminal_width ?(preview = false) ?(preview_position = Preview.Right) ~terminal_height ~query ~selected results =
+let render_lines ?terminal_width ?(preview = false) ?(preview_position = Preview.Right) ?(preview_scroll = 0) ~terminal_height ~query ~selected results =
   if terminal_height <= 0 then []
   else
     let clip_line line =
@@ -251,7 +267,7 @@ let render_lines ?terminal_width ?(preview = false) ?(preview_position = Preview
                     let result_width = layout.results.Preview.cols in
                     let preview_lines =
                       render_preview_box ~width:preview_rect.cols ~height:preview_rect.rows
-                        ~selected:(selected_candidate_text ~selected results)
+                        ~scroll:preview_scroll ~selected:(selected_candidate_text ~selected results)
                     in
                     let result_lines =
                       if result_count = 0 then [ Text_width.clip ~width:result_width (empty_results_message ~query) ]
@@ -291,7 +307,7 @@ let render_lines ?terminal_width ?(preview = false) ?(preview_position = Preview
                     in
                     let preview_lines =
                       render_preview_box ~width:preview_rect.cols ~height:preview_rect.rows
-                        ~selected:(selected_candidate_text ~selected results)
+                        ~scroll:preview_scroll ~selected:(selected_candidate_text ~selected results)
                     in
                     result_lines @ preview_lines)
     in
@@ -326,6 +342,7 @@ let render handle state =
   Terminal.move_cursor handle ~row:1 ~col:1;
   render_lines ~terminal_height:terminal_size.rows ~terminal_width:terminal_size.cols
     ~preview:state.preview ~preview_position:state.preview_position
+    ~preview_scroll:state.preview_scroll
     ~query:state.query ~selected:state.selected state.results
   |> List.iter (render_line handle);
   Terminal.move_cursor handle ~row:1 ~col:(prompt.cursor_col + 1)
@@ -339,6 +356,47 @@ let cleanup handle =
    with _ -> ());
   Terminal.restore handle
 
+let preview_visible_rows ~terminal_height ~terminal_width ~preview ~preview_position =
+  let layout =
+    Preview.compute_layout ~terminal_rows:terminal_height ~terminal_cols:terminal_width
+      ~preview ~position:preview_position
+  in
+  match layout.preview with
+  | None -> 0
+  | Some rect -> max 0 (rect.Preview.rows - 3)
+
+let clamp_state_preview_scroll state =
+  let size = Terminal.terminal_size () in
+  let visible_rows =
+    preview_visible_rows ~terminal_height:size.rows ~terminal_width:size.cols
+      ~preview:state.preview ~preview_position:state.preview_position
+  in
+  let content =
+    Preview.content_for_selection ~max_bytes:Preview.max_preview_bytes
+      (selected_candidate_text ~selected:state.selected state.results)
+  in
+  let line_count = Preview.content_line_count content in
+  Preview.clamp_scroll ~scroll:state.preview_scroll ~line_count ~visible_rows
+
+let apply_preview_scroll_key key state =
+  let size = Terminal.terminal_size () in
+  let visible_rows =
+    preview_visible_rows ~terminal_height:size.rows ~terminal_width:size.cols
+      ~preview:state.preview ~preview_position:state.preview_position
+  in
+  match preview_scroll_delta ~visible_rows key with
+  | None -> None
+  | Some delta ->
+      let content =
+        Preview.content_for_selection ~max_bytes:Preview.max_preview_bytes
+          (selected_candidate_text ~selected:state.selected state.results)
+      in
+      let line_count = Preview.content_line_count content in
+      let preview_scroll =
+        Preview.scroll_by ~scroll:state.preview_scroll ~delta ~line_count ~visible_rows
+      in
+      Some { state with preview_scroll }
+
 let run_loop handle ~preview:handle_preview ~preview_position:handle_preview_position ~initial_query:handle_initial_query candidates =
   let rec loop state =
     render handle state;
@@ -346,9 +404,36 @@ let run_loop handle ~preview:handle_preview ~preview_position:handle_preview_pos
     | Terminal.Ctrl_c -> (None, 130)
     | Terminal.Escape -> (None, 1)
     | Terminal.Enter -> selected_result ~selected:state.selected state.results
-    | (Terminal.Arrow_up | Terminal.Arrow_down) as key ->
+    | key when state.preview -> (
+        match apply_preview_scroll_key key state with
+        | Some state -> loop state
+        | None ->
+            let page_size =
+              let size = Terminal.terminal_size () in
+              max 1 (result_rows ~terminal_height:size.rows)
+            in
+            (match key with
+            | Terminal.Arrow_up | Terminal.Arrow_down | Terminal.Page_up | Terminal.Page_down ->
+                let selected =
+                  apply_key_to_selection ~page_size key ~selected:state.selected
+                    ~result_count:(List.length state.results)
+                in
+                let state =
+                  if selected = state.selected then
+                    { state with preview_scroll = clamp_state_preview_scroll state }
+                  else { state with selected; preview_scroll = 0 }
+                in
+                loop state
+            | _ ->
+                let query = apply_key_to_query key ~query:state.query in
+                if query = state.query then loop state else loop (recompute candidates state query)))
+    | (Terminal.Arrow_up | Terminal.Arrow_down | Terminal.Page_up | Terminal.Page_down) as key ->
+        let page_size =
+          let size = Terminal.terminal_size () in
+          max 1 (result_rows ~terminal_height:size.rows)
+        in
         let selected =
-          apply_key_to_selection key ~selected:state.selected
+          apply_key_to_selection ~page_size key ~selected:state.selected
             ~result_count:(List.length state.results)
         in
         loop { state with selected }

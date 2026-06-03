@@ -88,6 +88,26 @@ let assert_not_contains message ~needle value =
 
 let score query candidate = (require_match query candidate).score
 
+let write_file path contents =
+  let channel = open_out_bin path in
+  output_string channel contents;
+  close_out channel
+
+let with_temp_dir callback =
+  let base = Filename.temp_file "ofzf-test" "dir" in
+  Sys.remove base;
+  Unix.mkdir base 0o700;
+  Fun.protect ~finally:(fun () ->
+      let rec remove_tree path =
+        if Sys.is_directory path then (
+          Sys.readdir path
+          |> Array.iter (fun child -> remove_tree (Filename.concat path child));
+          Unix.rmdir path)
+        else Sys.remove path
+      in
+      remove_tree base)
+    (fun () -> callback base)
+
 let () =
   assert_true "case-insensitive match"
     (Ofzf.Matcher.matches ~query:"OF" "src/ofzf.ml");
@@ -208,6 +228,14 @@ let () =
     (Ofzf.Terminal.parse_key_sequence "\021");
   assert_equal_key "parse ctrl-w" Ofzf.Terminal.Ctrl_w
     (Ofzf.Terminal.parse_key_sequence "\023");
+  assert_equal_key "parse ctrl-b" Ofzf.Terminal.Ctrl_b
+    (Ofzf.Terminal.parse_key_sequence "\002");
+  assert_equal_key "parse ctrl-f" Ofzf.Terminal.Ctrl_f
+    (Ofzf.Terminal.parse_key_sequence "\006");
+  assert_equal_key "parse ctrl-y" Ofzf.Terminal.Ctrl_y
+    (Ofzf.Terminal.parse_key_sequence "\025");
+  assert_equal_key "parse ctrl-e" Ofzf.Terminal.Ctrl_e
+    (Ofzf.Terminal.parse_key_sequence "\005");
   assert_equal_key "parse ctrl-c" Ofzf.Terminal.Ctrl_c
     (Ofzf.Terminal.parse_key_sequence "\003");
   assert_equal_key "parse enter" Ofzf.Terminal.Enter
@@ -221,6 +249,14 @@ let () =
   assert_equal_key "parse unknown long escape sequence"
     (Ofzf.Terminal.Unknown "\027[1;5A")
     (Ofzf.Terminal.parse_key_sequence "\027[1;5A");
+  assert_equal_key "parse page up" Ofzf.Terminal.Page_up
+    (Ofzf.Terminal.parse_key_sequence "\027[5~");
+  assert_equal_key "parse page down" Ofzf.Terminal.Page_down
+    (Ofzf.Terminal.parse_key_sequence "\027[6~");
+  assert_equal_key "parse alt up" Ofzf.Terminal.Alt_up
+    (Ofzf.Terminal.parse_key_sequence "\027[1;3A");
+  assert_equal_key "parse alt down" Ofzf.Terminal.Alt_down
+    (Ofzf.Terminal.parse_key_sequence "\027[1;3B");
 
   let normalized =
     Ofzf.Terminal.normalize_size
@@ -249,12 +285,27 @@ let () =
   assert_equal_string_list "no selected preview message"
     [ "preview: no selected result" ]
     (Ofzf.Preview.render_preview_lines ~terminal_width:80 ~selected:None);
-  assert_equal_string_list "selected preview renders candidate"
-    [ "preview: selected candidate"; "matcher.ml" ]
-    (Ofzf.Preview.render_preview_lines ~terminal_width:80 ~selected:(Some "matcher.ml"));
+  assert_equal_string_list "selected preview renders plain candidate text"
+    [ "preview: text: candidate text"; "plain candidate text" ]
+    (Ofzf.Preview.render_preview_lines ~terminal_width:80
+       ~selected:(Some "plain candidate text"));
   assert_equal_string_list "selected preview clips long text"
-    [ "preview:"; "matcher." ]
-    (Ofzf.Preview.render_preview_lines ~terminal_width:8 ~selected:(Some "matcher.ml"));
+    [ "preview:"; "matcher " ]
+    (Ofzf.Preview.render_preview_lines ~terminal_width:8
+       ~selected:(Some "matcher text"));
+
+  assert_true "preview scroll clamps high values"
+    (Ofzf.Preview.clamp_scroll ~scroll:100 ~line_count:10 ~visible_rows:3 = 7);
+  assert_true "preview scroll clamps low values"
+    (Ofzf.Preview.clamp_scroll ~scroll:(-2) ~line_count:10 ~visible_rows:3 = 0);
+  assert_true "preview scroll clamps empty content"
+    (Ofzf.Preview.clamp_scroll ~scroll:4 ~line_count:0 ~visible_rows:3 = 0);
+  assert_true "preview line down delta"
+    (Ofzf.Interactive.preview_scroll_delta ~visible_rows:5 Ofzf.Terminal.Ctrl_e = Some 1);
+  assert_true "preview page down delta"
+    (Ofzf.Interactive.preview_scroll_delta ~visible_rows:5 Ofzf.Terminal.Ctrl_f = Some 5);
+  assert_true "preview page up delta"
+    (Ofzf.Interactive.preview_scroll_delta ~visible_rows:5 Ofzf.Terminal.Ctrl_b = Some (-5));
 
   assert_true "ASCII display width uses one column per character"
     (Ofzf.Text_width.display_width "matcher" = 7);
@@ -325,6 +376,14 @@ let () =
     (Ofzf.Interactive.apply_key_to_selection Ofzf.Terminal.Arrow_down
        ~selected:2 ~result_count:3
     = 2);
+  assert_true "page down clamps to bottom"
+    (Ofzf.Interactive.apply_key_to_selection ~page_size:4 Ofzf.Terminal.Page_down
+       ~selected:1 ~result_count:5
+    = 4);
+  assert_true "page up clamps to top"
+    (Ofzf.Interactive.apply_key_to_selection ~page_size:4 Ofzf.Terminal.Page_up
+       ~selected:2 ~result_count:5
+    = 0);
   assert_true "visible window handles no results"
     (Ofzf.Interactive.visible_window ~selected:0 ~terminal_height:6
        ~result_count:0
@@ -501,6 +560,77 @@ let () =
   in
   assert_true "empty preview shows no selected message"
     (List.exists (contains_substring ~needle:"no selected result") empty_preview_lines);
+
+  with_temp_dir (fun temp_dir ->
+      let file_path = Filename.concat temp_dir "preview.txt" in
+      let binary_path = Filename.concat temp_dir "binary.dat" in
+      let missing_path = Filename.concat temp_dir "missing.txt" in
+      write_file file_path "line1\r\n界abc\r\nline3\nline4\n";
+      write_file binary_path "abc\000def";
+      (match Ofzf.Preview.classify_candidate file_path with
+      | Ofzf.Preview.Regular_file_path path -> assert_equal_string "regular file classification" file_path path
+      | _ -> failwith "regular file classification: unexpected kind");
+      (match Ofzf.Preview.classify_candidate temp_dir with
+      | Ofzf.Preview.Directory_path path -> assert_equal_string "directory classification" temp_dir path
+      | _ -> failwith "directory classification: unexpected kind");
+      (match Ofzf.Preview.classify_candidate missing_path with
+      | Ofzf.Preview.Missing_path_value path -> assert_equal_string "missing file classification" missing_path path
+      | _ -> failwith "missing file classification: unexpected kind");
+      (match Ofzf.Preview.classify_candidate "plain candidate text" with
+      | Ofzf.Preview.Plain_text_value text -> assert_equal_string "plain text fallback classification" "plain candidate text" text
+      | _ -> failwith "plain text fallback classification: unexpected kind");
+      let file_content = Ofzf.Preview.content_for_selection ~max_bytes:Ofzf.Preview.max_preview_bytes (Some file_path) in
+      assert_true "regular file preview kind" (file_content.kind = Ofzf.Preview.Regular_file);
+      assert_equal_string_list "CRLF preview normalization" [ "line1"; "界abc"; "line3"; "line4" ] file_content.lines;
+      let limited_content = Ofzf.Preview.content_for_selection ~max_bytes:3 (Some file_path) in
+      assert_true "maximum preview bytes marks truncation" limited_content.truncated;
+      assert_equal_string_list "maximum preview bytes limits content" [ "lin" ] limited_content.lines;
+      let binary_content = Ofzf.Preview.content_for_selection ~max_bytes:Ofzf.Preview.max_preview_bytes (Some binary_path) in
+      assert_true "binary-looking preview kind" (binary_content.kind = Ofzf.Preview.Binary_file);
+      assert_true "binary-looking preview message"
+        (List.exists (contains_substring ~needle:"binary-looking") binary_content.lines);
+      let directory_content = Ofzf.Preview.content_for_selection ~max_bytes:Ofzf.Preview.max_preview_bytes (Some temp_dir) in
+      assert_true "directory preview kind" (directory_content.kind = Ofzf.Preview.Directory);
+      let missing_content = Ofzf.Preview.content_for_selection ~max_bytes:Ofzf.Preview.max_preview_bytes (Some missing_path) in
+      assert_true "missing preview kind" (missing_content.kind = Ofzf.Preview.Missing_path);
+      let text_content = Ofzf.Preview.content_for_selection ~max_bytes:Ofzf.Preview.max_preview_bytes (Some "plain candidate text") in
+      assert_true "plain candidate preview kind" (text_content.kind = Ofzf.Preview.Candidate_text);
+      let clipped_preview =
+        Ofzf.Preview.render_content_lines ~terminal_width:3 ~height:3 ~scroll:0
+          { Ofzf.Preview.kind = Ofzf.Preview.Regular_file; title = "unicode"; lines = [ "界abc" ]; truncated = false }
+      in
+      assert_equal_string "preview clips Unicode by display width" "界a"
+        (List.nth clipped_preview 1);
+      assert_contains "preview title includes source type" ~needle:"preview: file"
+        (Ofzf.Preview.format_title ~scroll:0 ~visible_rows:3 file_content);
+      assert_contains "preview title includes scroll status" ~needle:"1-2/4"
+        (Ofzf.Preview.format_title ~scroll:0 ~visible_rows:2 file_content);
+      let file_result = Ofzf.Matcher.{ candidate = file_path; positions = []; score = 0 } in
+      let right_file_preview =
+        Ofzf.Interactive.render_lines ~terminal_height:10 ~terminal_width:80 ~preview:true
+          ~preview_position:Ofzf.Preview.Right ~query:"" ~selected:0 [ file_result ]
+      in
+      assert_true "right preview renders file content"
+        (List.exists (contains_substring ~needle:"line1") right_file_preview);
+      let bottom_file_preview =
+        Ofzf.Interactive.render_lines ~terminal_height:14 ~terminal_width:80 ~preview:true
+          ~preview_position:Ofzf.Preview.Bottom ~query:"" ~selected:0 [ file_result ]
+      in
+      assert_true "bottom preview renders file content"
+        (List.exists (contains_substring ~needle:"line1") bottom_file_preview);
+      let scrolled_preview =
+        Ofzf.Interactive.render_lines ~terminal_height:10 ~terminal_width:80 ~preview:true
+          ~preview_position:Ofzf.Preview.Right ~preview_scroll:1 ~query:"" ~selected:0
+          [ file_result ]
+      in
+      assert_true "preview scroll shows later lines"
+        (List.exists (contains_substring ~needle:"界abc") scrolled_preview);
+      let disabled_preview =
+        Ofzf.Interactive.render_lines ~terminal_height:10 ~terminal_width:80 ~preview:false
+          ~query:"" ~selected:0 [ file_result ]
+      in
+      assert_true "preview disabled omits file preview content"
+        (not (List.exists (contains_substring ~needle:"line1") disabled_preview)));
 
   let none_selected, none_code = Ofzf.Interactive.selected_result ~selected:0 [] in
   assert_true "enter with no result has no selected output" (none_selected = None);

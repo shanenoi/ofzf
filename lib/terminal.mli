@@ -7,13 +7,21 @@
 type key =
   | Character of char
   | Backspace
+  | Ctrl_b
+  | Ctrl_e
+  | Ctrl_f
   | Ctrl_u
   | Ctrl_w
+  | Ctrl_y
   | Ctrl_c
   | Enter
   | Escape
   | Arrow_up
   | Arrow_down
+  | Alt_up
+  | Alt_down
+  | Page_up
+  | Page_down
   | Unknown of string
 (** Decoded key events used by the interactive loop. *)
 
