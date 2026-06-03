@@ -190,6 +190,8 @@ let () =
 
   assert_cli_ok "parse preview interactive with query" [ "ofzf"; "--preview"; "abc" ]
     { query = "abc"; limit = None; mode = Interactive; preview = true; preview_position = Preview_right };
+  assert_cli_ok "parse preview interactive without query" [ "ofzf"; "--preview" ]
+    { query = ""; limit = None; mode = Interactive; preview = true; preview_position = Preview_right };
   assert_cli_ok "parse preview right" [ "ofzf"; "--preview"; "--preview-position"; "right"; "abc" ]
     { query = "abc"; limit = None; mode = Interactive; preview = true; preview_position = Preview_right };
   assert_cli_ok "parse preview bottom" [ "ofzf"; "--preview"; "--preview-position"; "bottom"; "abc" ]

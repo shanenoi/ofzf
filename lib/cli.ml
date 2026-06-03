@@ -30,7 +30,8 @@ let parse argv =
   let rec loop mode limit preview preview_position = function
     | [] -> (
         match (mode, limit) with
-        | Search, None -> Ok { query = ""; limit = None; mode = Interactive; preview; preview_position }
+        | Search, None | Interactive, None ->
+            Ok { query = ""; limit = None; mode = Interactive; preview; preview_position }
         | _ -> Error Missing_query)
     | "--bench" :: rest -> loop Bench limit preview preview_position rest
     | "--limit" :: raw_limit :: rest -> (

@@ -61,5 +61,5 @@ val selected_result : selected:int -> Matcher.match_result list -> (Matcher.matc
 (** Enter-key result helper. Returns [(Some result, 0)] when a result exists and
     [(None, 1)] when Enter is pressed with no selectable result. *)
 
-val run : ?preview:bool -> ?preview_position:Preview.position -> ?initial_query:string -> candidates:string list -> int
+val run : preview:bool -> preview_position:Preview.position -> initial_query:string -> candidates:string list -> int
 (** Run interactive mode. Returns the intended process exit code. *)

@@ -81,9 +81,6 @@ let empty_results_message ~query =
   if query = "" then "(no candidates match the empty query)"
   else Printf.sprintf "(no matches for %S)" query
 
-let is_position positions index =
-  List.exists (( = ) index) positions
-
 let is_cell_position positions cell =
   List.exists
     (fun position -> position >= cell.Text_width.byte_start && position < cell.byte_end)
@@ -200,7 +197,7 @@ let render_preview_box ~width ~height ~selected =
   else
     let content_width = max 0 (width - 2) in
     let content = render_preview_pane ~terminal_width:content_width ~selected in
-    let rec pad line =
+    let pad line =
       let clipped = Text_width.clip ~width:content_width line in
       let pad_width = max 0 (content_width - Text_width.display_width clipped) in
       "|" ^ clipped ^ String.make pad_width ' ' ^ "|"
@@ -361,7 +358,7 @@ let run_loop handle ~preview:handle_preview ~preview_position:handle_preview_pos
   in
   loop (initial_state ~preview:handle_preview ~preview_position:handle_preview_position ~initial_query:handle_initial_query candidates)
 
-let run ?(preview = false) ?(preview_position = Preview.Right) ?(initial_query = "") ~candidates =
+let run ~preview ~preview_position ~initial_query ~candidates =
   if candidates = [] then (
     prerr_endline "ofzf: no candidates on stdin for interactive mode";
     1)
