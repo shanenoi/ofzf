@@ -21,15 +21,15 @@ type error =
   | Preview_conflicts_with_limit
 
 type raw_config = {
-  query : string option;
-  limit : int option;
-  bench : bool;
-  preview : bool;
-  preview_position : preview_position option;
+  raw_query : string option;
+  raw_limit : int option;
+  raw_bench : bool;
+  raw_preview : bool;
+  raw_preview_position : preview_position option;
 }
 
 let empty_raw =
-  { query = None; limit = None; bench = false; preview = false; preview_position = None }
+  { raw_query = None; raw_limit = None; raw_bench = false; raw_preview = false; raw_preview_position = None }
 
 let usage program =
   Printf.sprintf
@@ -48,23 +48,23 @@ let parse_preview_position = function
   | value -> Error (Invalid_preview_position value)
 
 let set_query (raw : raw_config) query =
-  match raw.query with
-  | None -> Ok { raw with query = Some query }
+  match raw.raw_query with
+  | None -> Ok { raw with raw_query = Some query }
   | Some _ -> Error Missing_query
 
 let parse_raw args =
   let rec loop raw = function
     | [] -> Ok raw
-    | "--bench" :: rest -> loop { raw with bench = true } rest
+    | "--bench" :: rest -> loop { raw with raw_bench = true } rest
     | "--limit" :: raw_limit :: rest -> (
         match parse_limit raw_limit with
-        | Ok limit -> loop { raw with limit = Some limit } rest
+        | Ok limit -> loop { raw with raw_limit = Some limit } rest
         | Error error -> Error error)
     | "--limit" :: [] -> Error (Invalid_limit "")
-    | "--preview" :: rest -> loop { raw with preview = true } rest
+    | "--preview" :: rest -> loop { raw with raw_preview = true } rest
     | "--preview-position" :: raw_position :: rest -> (
         match parse_preview_position raw_position with
-        | Ok preview_position -> loop { raw with preview_position = Some preview_position } rest
+        | Ok preview_position -> loop { raw with raw_preview_position = Some preview_position } rest
         | Error error -> Error error)
     | "--preview-position" :: [] -> Error Missing_preview_position
     | query :: rest -> (
@@ -75,21 +75,24 @@ let parse_raw args =
   loop empty_raw args
 
 let validate (raw : raw_config) =
-  match (raw.preview_position, raw.preview, raw.bench, raw.limit, raw.query) with
+  match (raw.raw_preview_position, raw.raw_preview, raw.raw_bench, raw.raw_limit, raw.raw_query) with
   | Some _, false, _, _, _ -> Error Preview_position_without_preview
   | _, true, true, _, _ -> Error Preview_conflicts_with_bench
   | _, true, _, Some _, _ -> Error Preview_conflicts_with_limit
   | _, _, true, _, None -> Error Missing_query
   | _, false, false, Some _, None -> Error Missing_query
   | _ ->
-      let preview_position = Option.value raw.preview_position ~default:Preview_right in
-      let query = Option.value raw.query ~default:"" in
+      let preview_position = Option.value raw.raw_preview_position ~default:Preview_right in
+      let query = Option.value raw.raw_query ~default:"" in
       let mode =
-        if raw.bench then Bench
-        else if raw.preview || raw.query = None then Interactive
+        if raw.raw_bench then Bench
+        else if raw.raw_preview || raw.raw_query = None then Interactive
         else Search
       in
-      Ok { query; limit = raw.limit; mode; preview = raw.preview; preview_position }
+      let config : config =
+        { query; limit = raw.raw_limit; mode; preview = raw.raw_preview; preview_position }
+      in
+      Ok config
 
 let parse argv =
   match Array.to_list argv with

@@ -1,7 +1,5 @@
 open Test_support
 
-let fixture name = Filename.concat "test/fixtures" name
-
 let () =
   assert_true "parse preview right" (Ofzf.Preview.parse_position "right" = Some Ofzf.Preview.Right);
   assert_true "parse preview bottom" (Ofzf.Preview.parse_position "bottom" = Some Ofzf.Preview.Bottom);
@@ -29,7 +27,7 @@ let () =
   let crlf_file = fixture "crlf.txt" in
   let binary_file = fixture "binary_like.bin" in
   let directory = fixture "preview_dir" in
-  let missing = fixture "missing-file.txt" in
+  let missing = missing_fixture "missing-file.txt" in
   (match Ofzf.Preview.classify_candidate unicode_file with
   | Ofzf.Preview.Regular_file_path path -> assert_equal_string "unicode file classification" unicode_file path
   | _ -> failwith "unicode file classification: unexpected kind");

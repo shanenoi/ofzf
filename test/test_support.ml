@@ -134,3 +134,22 @@ let exit_code = function
   | Unix.WSTOPPED signal -> 128 + signal
 
 let ofzf_binary () = Sys.getenv_opt "OFZF_TEST_BIN"
+
+let fixture_dir () =
+  let candidates =
+    [
+      "test/fixtures";
+      "fixtures";
+      Filename.concat ".." "test/fixtures";
+      Filename.concat ".." "fixtures";
+      Filename.concat (Filename.concat ".." "..") "test/fixtures";
+      Filename.concat (Filename.concat ".." "..") "fixtures";
+    ]
+  in
+  match List.find_opt Sys.file_exists candidates with
+  | Some path -> path
+  | None -> "test/fixtures"
+
+let fixture name = Filename.concat (fixture_dir ()) name
+
+let missing_fixture name = Filename.concat (fixture_dir ()) name

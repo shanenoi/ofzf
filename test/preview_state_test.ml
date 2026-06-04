@@ -1,5 +1,4 @@
-let assert_true message value = if not value then failwith message
-let fixture name = Filename.concat "test/fixtures" name
+open Test_support
 
 let () =
   let open Ofzf.Preview_state in
@@ -24,7 +23,7 @@ let () =
 
   let directory = update default (Some (fixture "preview_dir")) in
   assert_true "directory content loaded" (directory.content.kind = Ofzf.Preview.Directory);
-  let missing = update default (Some (fixture "missing-file.txt")) in
+  let missing = update default (Some (missing_fixture "missing-file.txt")) in
   assert_true "missing content loaded" (missing.content.kind = Ofzf.Preview.Missing_path);
   let plain = update default (Some "plain text candidate") in
   assert_true "plain fallback content loaded" (plain.content.kind = Ofzf.Preview.Candidate_text);
