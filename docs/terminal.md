@@ -58,7 +58,8 @@ Raw key input is byte-oriented. The current MVP decodes:
 - `ESC [ A` as Arrow Up;
 - `ESC [ B` as Arrow Down;
 - `ESC [ 5 ~` / `ESC [ 6 ~` as Page Up / Page Down;
-- common Alt-Up / Alt-Down sequences where practical.
+- common Alt-Up / Alt-Down sequences where practical;
+- SIGWINCH resize notifications as `Resize` events.
 
 Escape sequences are read with a short timeout after the initial Escape byte so
 a plain Escape key can still be recognized. Unsupported escape sequences become
@@ -85,15 +86,18 @@ primitives.
 
 ## Terminal size
 
-Size detection first checks `LINES` and `COLUMNS`, then tries a best-effort
-`stty size < /dev/tty`. If neither works, the fallback size is 20 rows by 80
-columns. `normalize_size` is a pure helper used by tests and runtime fallback
-logic to replace invalid dimensions.
+Size detection prefers ioctl `TIOCGWINSZ` on the active `/dev/tty` handle when
+interactive mode has one. If that is unavailable, it tries ioctl on `/dev/tty`,
+then `LINES`/`COLUMNS`, then a best-effort `stty size < /dev/tty`. If none of
+those work, the fallback size is 20 rows by 80 columns. `normalize_size` and
+`parse_stty_size` are pure helpers used by tests and runtime fallback logic.
 
 Interactive mode detects size once per event/render iteration and passes that
-size through viewport and render helpers. That avoids repeated `stty` calls
-within one frame while preserving redraw-driven resize handling without adding
-signal handlers or background work.
+size through viewport and render helpers. That avoids repeated terminal-size
+lookups within one frame. `Terminal.enter_raw_mode` installs a SIGWINCH handler
+that marks a pending resize; the next interrupted/observed read becomes a
+`Resize` event so the loop can redraw with fresh dimensions without mixing UI
+output into stdout.
 
 ## Width behavior
 
@@ -103,7 +107,8 @@ layout. Non-interactive output is not clipped.
 
 ## Limitations
 
-- Resize handling is redraw-driven rather than SIGWINCH-driven.
+- Resize handling is SIGWINCH-aware but still redraws whole frames rather than
+  doing partial terminal updates.
 - No mouse input.
 - No UTF-8-aware editing; Backspace removes one byte.
 - No async input or background indexing.

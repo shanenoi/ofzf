@@ -155,7 +155,7 @@ let is_selection_key = function
 let run_loop handle ~preview:handle_preview ~preview_position:handle_preview_position
     ~initial_query:handle_initial_query candidates =
   let rec loop state =
-    let size = Terminal.terminal_size () in
+    let size = Terminal.terminal_size ~handle () in
     Debug.logf "terminal_size rows=%d cols=%d preview=%b layout=%s"
       size.Terminal.rows size.Terminal.cols state.preview
       (Preview.position_to_string state.preview_position);
@@ -168,6 +168,7 @@ let run_loop handle ~preview:handle_preview ~preview_position:handle_preview_pos
     | Terminal.Ctrl_c -> (None, 130)
     | Terminal.Escape -> (None, 1)
     | Terminal.Enter -> selected_result ~selected:state.selected state.results
+    | Terminal.Resize -> loop (clamp_state_preview_scroll ~visible_rows:visible_preview_rows state)
     | key when state.preview -> (
         match apply_preview_scroll_key ~visible_rows:visible_preview_rows key state with
         | Some state -> loop state

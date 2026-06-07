@@ -1,3 +1,6 @@
 (library
  (name ofzf)
- (libraries unix))
+ (libraries unix)
+ (foreign_stubs
+  (language c)
+  (names terminal_size_stubs)))

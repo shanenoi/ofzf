@@ -22,6 +22,7 @@ type key =
   | Alt_down
   | Page_up
   | Page_down
+  | Resize
   | Unknown of string
 (** Decoded key events used by the interactive loop. *)
 
@@ -36,6 +37,9 @@ val fallback_size : size
 
 val normalize_size : ?fallback:size -> size -> size
 (** Pure helper that replaces non-positive dimensions with fallback values. *)
+
+val parse_stty_size : string -> size option
+(** Pure parser for [stty size] output, which is normally ["ROWS COLS"]. *)
 
 val parse_key_sequence : string -> key
 (** Pure key parser used by tests and by [read_key]. *)
@@ -74,5 +78,7 @@ val terminal_height : unit -> int
 val terminal_width : unit -> int
 (** Best-effort terminal width. Falls back to [80]. *)
 
-val terminal_size : unit -> size
-(** Best-effort terminal size. Uses [LINES]/[COLUMNS], then [stty size], then a safe fallback. *)
+val terminal_size : ?handle:handle -> unit -> size
+(** Best-effort terminal size. Prefer ioctl on the active [/dev/tty] handle when
+    available, then try ioctl on [/dev/tty], [LINES]/[COLUMNS], [stty size], and
+    finally a safe fallback. *)

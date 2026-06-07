@@ -76,14 +76,14 @@ Each loop iteration detects terminal size once, then:
 6. highlights matched characters from matcher positions;
 7. applies ANSI inverse video to the selected row while preserving match
    highlighting;
-8. reads the next key event.
+8. reads the next key event, including resize notifications.
 
 The visible result window is based on terminal height where practical, and rows
 are clipped to terminal width where practical. The fallback size is 20x80.
 Correctness is favored over minimal redraw in this version, so the whole visible
-UI is redrawn after each key. Redraws clear stale content when the result count
-shrinks and the pure renderer caps output to the detected terminal height,
-including very small terminal heights.
+UI is redrawn after each key or resize event. Redraws clear stale content when
+the result count shrinks and the pure renderer caps output to the detected
+terminal height, including very small terminal heights.
 
 `Render` owns frame generation and performs no filesystem IO. Preview content is
 loaded by `Preview_state` when selection changes, then passed into render helpers
@@ -114,11 +114,12 @@ emit unnecessary ANSI sequences.
 
 ## Terminal resize and width behavior
 
-Interactive mode asks `Terminal.terminal_size` on every redraw. This gives a
-simple synchronous resize strategy: when the terminal changes size, the next key
-or redraw recalculates the viewport and keeps the selected row visible. Very
-small heights produce fewer or zero result rows instead of writing past the
-screen.
+Interactive mode asks `Terminal.terminal_size` on every redraw, preferring ioctl
+on the active `/dev/tty` handle. SIGWINCH is converted into a `Resize` key event
+so terminal changes can trigger a redraw even when the user has not typed a
+normal key. Each redraw recalculates the viewport and keeps the selected row
+visible. Very small heights produce fewer or zero result rows instead of writing
+past the screen.
 
 Prompt, status, and result rows are clipped to terminal width. This keeps long
 paths from breaking the layout while preserving non-interactive output exactly
@@ -157,7 +158,7 @@ candidate IDs, and background indexing.
 - Preview is synchronous and file/text-only; command-based preview is deferred.
 - No multi-select.
 - No mouse support.
-- Resize handling is redraw-driven rather than signal-driven.
+- Resize handling is signal-aware but still full-frame rather than partial.
 - Query editing is byte/cell-boundary based rather than fully grapheme-aware.
 - Highlighting is byte-position-based, matching the current matcher API.
 

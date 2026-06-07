@@ -13,7 +13,7 @@ original non-interactive fuzzy-filter behavior.
 
 ## Current status
 
-Implemented through v0.12 Preview File Content + Preview Scrolling plus three
+Implemented through v0.13 Terminal Size + Resize Hardening plus three
 technical-debt stabilization passes:
 
 - Case-insensitive subsequence fuzzy matching.
@@ -36,6 +36,10 @@ technical-debt stabilization passes:
 - Stable prompt/status layout with result counts, selected index, empty-result
   messaging, and viewport edge-case handling.
 - Terminal height and width detection with safe fallbacks.
+- Preferred ioctl-based terminal size detection with `LINES`/`COLUMNS`, `stty`,
+  and 20x80 fallbacks when ioctl is unavailable.
+- SIGWINCH-driven resize notifications so interactive redraw can respond to
+  terminal changes without writing UI bytes to stdout.
 - Clipped interactive row rendering so long candidates do not break layout.
 - Ctrl-U query clear, Ctrl-W previous-word deletion, and safer unknown escape
   handling.

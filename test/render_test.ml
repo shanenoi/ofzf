@@ -1,4 +1,8 @@
 let assert_true message value = if not value then failwith message
+let assert_equal_int message expected actual =
+  if expected <> actual then
+    failwith (Printf.sprintf "%s: expected %d but got %d" message expected actual)
+
 let contains ~needle value =
   let n = String.length needle and l = String.length value in
   let rec loop i =
@@ -10,6 +14,14 @@ let contains ~needle value =
   loop 0
 
 let result candidate positions = Ofzf.Matcher.{ candidate; positions; score = 0 }
+
+let assert_lines_fit ~message ~terminal_height ~terminal_width lines =
+  assert_true (message ^ " height") (List.length lines <= max 0 terminal_height);
+  List.iter
+    (fun line ->
+      assert_true (message ^ " width")
+        (Ofzf.Text_width.display_width_ansi line <= max 0 terminal_width))
+    lines
 
 let () =
   let highlighted = Ofzf.Render.render_candidate ~selected:false ~positions:[ 0; 1 ] ~candidate:"matcher" in
@@ -34,4 +46,30 @@ let () =
   in
   assert_true "bottom preview composition contains preview" (List.exists (contains ~needle:"preview line") bottom);
   let empty = Ofzf.Render.render_lines ~terminal_height:4 ~terminal_width:80 ~query:"zz" ~selected:0 [] in
-  assert_true "empty result message" (List.exists (contains ~needle:"no matches") empty)
+  assert_true "empty result message" (List.exists (contains ~needle:"no matches") empty);
+  let zero =
+    Ofzf.Render.render_lines ~terminal_height:0 ~terminal_width:80 ~query:"m" ~selected:0
+      [ result "matcher" [ 0 ] ]
+  in
+  assert_equal_int "height zero renders no rows" 0 (List.length zero);
+  let one =
+    Ofzf.Render.render_lines ~terminal_height:1 ~terminal_width:80 ~query:"m" ~selected:0
+      [ result "matcher" [ 0 ] ]
+  in
+  assert_equal_int "height one renders one row" 1 (List.length one);
+  let two =
+    Ofzf.Render.render_lines ~terminal_height:2 ~terminal_width:80 ~query:"m" ~selected:0
+      [ result "matcher" [ 0 ] ]
+  in
+  assert_equal_int "height two renders two rows" 2 (List.length two);
+  let narrow =
+    Ofzf.Render.render_lines ~terminal_height:6 ~terminal_width:1 ~query:"matcher" ~selected:0
+      [ result "very-long-matcher" [ 0; 10 ] ]
+  in
+  assert_lines_fit ~message:"very narrow render" ~terminal_height:6 ~terminal_width:1 narrow;
+  let tiny_preview =
+    Ofzf.Render.render_lines ~terminal_height:2 ~terminal_width:1 ~preview:true
+      ~preview_position:Ofzf.Preview.Right ~preview_content:content ~query:"m" ~selected:0
+      [ result "matcher" [ 0 ] ]
+  in
+  assert_lines_fit ~message:"tiny preview render" ~terminal_height:2 ~terminal_width:1 tiny_preview

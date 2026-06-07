@@ -1,15 +1,21 @@
 # Terminal Hardening
 
-v0.8 hardens the interactive MVP without adding large product features. The
-focus is making raw ANSI rendering safer when terminal dimensions, input
-sequences, or result sets change.
+v0.8 started hardening the interactive MVP without adding large product
+features. v0.13 extends that work by preferring ioctl-based terminal size
+detection and making resize redraws SIGWINCH-aware.
 
 ## Resize strategy
 
-The renderer asks `Terminal.terminal_size` on each redraw. Size detection checks
-`LINES` and `COLUMNS`, then tries `stty size < /dev/tty`, and finally falls back
-to `20x80`. This keeps resize handling simple and synchronous: no signal handler
-or async redraw loop is needed yet.
+The renderer asks `Terminal.terminal_size` on each redraw. Size detection now
+prefers ioctl `TIOCGWINSZ` on the active terminal handle, then tries ioctl on
+`/dev/tty`, `LINES`/`COLUMNS`, `stty size < /dev/tty`, and finally falls back to
+`20x80`.
+
+`Terminal.enter_raw_mode` installs a small SIGWINCH handler that records a
+pending resize. `Terminal.read_key` converts that pending resize into a `Resize`
+event when a read is interrupted or before reading the next key. The interactive
+loop handles `Resize` by recalculating size/layout and redrawing the frame;
+stdout remains reserved for the final selected result.
 
 After each detected size change, the visible window is recalculated from the
 current selected row. The selected row remains visible by choosing the smallest
@@ -75,7 +81,8 @@ result range:
 
 ## Current limitations
 
-- Resize is detected on redraw rather than via SIGWINCH.
+- Resize is SIGWINCH-aware, but rendering still redraws whole frames rather than
+  doing partial updates.
 - Clipping is display-width-aware but still approximate, not full grapheme-cluster aware.
 - Long ANSI-highlighted rows are clipped before writing, but candidate control
   characters are not escaped yet.

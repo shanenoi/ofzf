@@ -43,6 +43,7 @@ let scroll_delta ~visible_rows = function
   | Terminal.Arrow_down
   | Terminal.Page_up
   | Terminal.Page_down
+  | Terminal.Resize
   | Terminal.Unknown _ -> None
 
 let apply_scroll_key ~visible_rows key state =
