@@ -54,6 +54,7 @@ once, then hands control to `Interactive`.
 - case-insensitive subsequence matching;
 - zero-based byte match positions;
 - a stable public `match_result` API;
+- prepared-query helpers for repeated matching against many candidates;
 - compatibility wrappers around full ranking and top-k ranking.
 
 Matcher does not decide ranking policy. It finds positions and delegates score
@@ -71,7 +72,9 @@ calculation to `Scoring`.
 - prefix bonus;
 - path-depth penalty;
 - candidate-length penalty;
-- tie handling by original input order.
+- tie handling by original input order;
+- prepared-query scoring helpers so matching and ranking can reuse normalized
+  query state without moving scoring policy into callers.
 
 ### Top-k library
 
@@ -106,7 +109,9 @@ unbounded growth in long sessions.
 `lib/search_engine.ml` coordinates full and incremental search. Its
 `search_context` stores the previous query, previous candidate subset, query
 cache, and statistics. Normal CLI search remains streaming; `--bench` and the
-benchmark executable use this engine to measure incremental behavior.
+benchmark executable use this engine to measure incremental behavior. Search
+loops prepare each query once per pass and keep matcher/scoring internals inside
+their owning modules.
 
 ### CLI parser
 

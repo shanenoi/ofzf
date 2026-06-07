@@ -7,6 +7,15 @@ type candidate_match = {
   original_index : int;
 }
 
+(** A query normalized once for repeated scoring. This keeps hot search paths
+    from lowercasing the same query for every candidate while preserving the
+    public scoring semantics. *)
+type prepared_query
+
+val prepare_query : string -> prepared_query
+  (** [prepare_query query] stores [query] and its ASCII-lowercase form for
+      repeated scoring. *)
+
 val make_candidate_match :
   candidate:string -> positions:int list -> original_index:int -> candidate_match
   (** Construct a candidate match without exposing record-label disambiguation at
@@ -42,6 +51,11 @@ val score_breakdown :
 
 (** [score ~query ~candidate ~positions] returns only the total score. *)
 val score : query:string -> candidate:string -> positions:int list -> int
+
+(** [score_prepared ~query ~candidate ~positions] is equivalent to [score] but
+    reuses a prepared query. *)
+val score_prepared :
+  query:prepared_query -> candidate:string -> positions:int list -> int
 
 (** [score_match ~query match_] scores a successful candidate match. *)
 val score_match : query:string -> candidate_match -> scored_match

@@ -13,7 +13,7 @@ original non-interactive fuzzy-filter behavior.
 
 ## Current status
 
-Implemented through v0.14 Process-Level CLI Test Stabilization plus three
+Implemented through v0.15 Search Hot Path Optimization plus three
 technical-debt stabilization passes:
 
 - Case-insensitive subsequence fuzzy matching.
@@ -63,6 +63,9 @@ technical-debt stabilization passes:
   incremental-session memory growth.
 - The search-engine path carries successful matches through ranking so it avoids
   matching once for filtering and again for ranking where practical.
+- Hot search paths prepare the query once, avoid allocating lowercase candidate
+  copies during matching/scoring, and cheaply reject candidates shorter than the
+  query without changing observable ranking behavior.
 - The test suite is split by module/feature ownership and includes default
   process-level CLI smoke tests that build and exercise the real `ofzf` binary.
 - `OFZF_DEBUG=1` enables concise debug logs on stderr without changing normal

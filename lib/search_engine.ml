@@ -64,9 +64,10 @@ let add_stats base delta = {
 }
 
 let match_source ~query source =
+  let query = Matcher.prepare_query query in
   source
   |> List.mapi (fun original_index candidate ->
-         match Matcher.match_candidate ~query ~candidate with
+         match Matcher.match_prepared ~query ~candidate with
          | None -> None
          | Some result -> Some { result; original_index })
   |> List.filter_map Fun.id

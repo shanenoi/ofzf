@@ -27,10 +27,11 @@ let read_all_stdin () =
   loop []
 
 let run_full query =
+  let prepared_query = Ofzf.Matcher.prepare_query query in
   let rec loop index matches =
     match input_line stdin with
     | line -> (
-        match Ofzf.Matcher.match_candidate ~query ~candidate:line with
+        match Ofzf.Matcher.match_prepared ~query:prepared_query ~candidate:line with
         | None -> loop (index + 1) matches
         | Some result -> loop (index + 1) (scored_item index result :: matches))
     | exception End_of_file ->
@@ -40,10 +41,11 @@ let run_full query =
   loop 0 []
 
 let run_limited query limit =
+  let prepared_query = Ofzf.Matcher.prepare_query query in
   let rec loop index best =
     match input_line stdin with
     | line -> (
-        match Ofzf.Matcher.match_candidate ~query ~candidate:line with
+        match Ofzf.Matcher.match_prepared ~query:prepared_query ~candidate:line with
         | None -> loop (index + 1) best
         | Some result ->
             loop (index + 1) (Ofzf.Topk.add ~k:limit best (scored_item index result)))

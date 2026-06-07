@@ -7,6 +7,13 @@ type match_result = {
   score : int;
 }
 
+(** A query normalized once for repeated matching. *)
+type prepared_query
+
+val prepare_query : string -> prepared_query
+  (** [prepare_query query] prepares [query] for repeated fuzzy matching. It is
+      useful on hot paths that compare the same query against many candidates. *)
+
 (** [match_candidate ~query ~candidate] performs a case-insensitive fuzzy
     subsequence match.
 
@@ -15,9 +22,17 @@ type match_result = {
     score when the candidate matches. A higher score is better. *)
 val match_candidate : query:string -> candidate:string -> match_result option
 
+(** [match_prepared ~query ~candidate] is equivalent to [match_candidate] but
+    reuses a prepared query. *)
+val match_prepared : query:prepared_query -> candidate:string -> match_result option
+
 (** [matches ~query candidate] is [true] when [candidate] fuzzily matches
     [query]. *)
 val matches : query:string -> string -> bool
+
+(** [matches_prepared ~query candidate] is equivalent to [matches] but reuses a
+    prepared query. *)
+val matches_prepared : query:prepared_query -> string -> bool
 
 (** [rank ~query candidates] filters and sorts candidates by descending score.
     Score ties preserve the original input order. *)

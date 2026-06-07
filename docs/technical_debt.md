@@ -3,7 +3,8 @@
 Technical Debt Pass 3 keeps the Pass 2 module split, reorganizes tests by module
 ownership, adds process-level CLI smoke tests, and introduces minimal debug
 logging for future troubleshooting. v0.14 promotes that process-level coverage
-into the default Dune test workflow.
+into the default Dune test workflow. v0.15 keeps ranking behavior stable while
+reducing repeated query/candidate normalization on the search hot path.
 
 Completed in this pass:
 
@@ -20,6 +21,10 @@ Completed in this pass:
   preview, interactive helpers, rendering, query editing, selection, viewport,
   preview state, search engine, and query cache;
 - `cli_process_test` exercises the real compiled binary by default through Dune;
+- matcher/scoring now expose prepared-query helpers for hot loops without moving
+  ranking policy into CLI or interactive code;
+- matching avoids lowercase candidate-string allocation and rejects candidates
+  shorter than the query before scanning;
 - small preview fixtures cover Unicode names, long names, CRLF, binary-looking
   content, directories, and missing paths;
 - `OFZF_DEBUG=1` writes concise diagnostics to stderr without changing stdout.

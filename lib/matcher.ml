@@ -4,21 +4,53 @@ type match_result = {
   score : int;
 }
 
-let find_positions ~query ~candidate =
-  let query_length = String.length query in
+type prepared_query = {
+  value : string;
+  lower : string;
+  length : int;
+  scoring_query : Scoring.prepared_query;
+}
+
+let prepare_query value = {
+  value;
+  lower = String.lowercase_ascii value;
+  length = String.length value;
+  scoring_query = Scoring.prepare_query value;
+}
+
+let lowercase_ascii_char = function
+  | 'A' .. 'Z' as char -> Char.chr (Char.code char + 32)
+  | char -> char
+
+let array_prefix_to_list values length =
+  let rec loop index acc =
+    if index < 0 then acc else loop (index - 1) (values.(index) :: acc)
+  in
+  loop (length - 1) []
+
+let find_positions_prepared ~query ~candidate =
+  let query_length = query.length in
+  let candidate_length = String.length candidate in
   if query_length = 0 then Some []
+  else if query_length > candidate_length then None
   else
-    let query_lower = String.lowercase_ascii query in
-    let candidate_lower = String.lowercase_ascii candidate in
-    let candidate_length = String.length candidate in
-    let rec scan query_index candidate_index positions =
-      if query_index = query_length then Some (List.rev positions)
+    let positions = Array.make query_length 0 in
+    let rec scan query_index candidate_index =
+      if query_index = query_length then
+        Some (array_prefix_to_list positions query_length)
       else if candidate_index = candidate_length then None
-      else if query_lower.[query_index] = candidate_lower.[candidate_index] then
-        scan (query_index + 1) (candidate_index + 1) (candidate_index :: positions)
-      else scan query_index (candidate_index + 1) positions
+      else if
+        query.lower.[query_index]
+        = lowercase_ascii_char candidate.[candidate_index]
+      then (
+        positions.(query_index) <- candidate_index;
+        scan (query_index + 1) (candidate_index + 1))
+      else scan query_index (candidate_index + 1)
     in
-    scan 0 0 []
+    scan 0 0
+
+let find_positions ~query ~candidate =
+  find_positions_prepared ~query:(prepare_query query) ~candidate
 
 let result_of_scored (scored : Scoring.scored_match) =
   {
@@ -27,45 +59,65 @@ let result_of_scored (scored : Scoring.scored_match) =
     score = scored.Scoring.score;
   }
 
-let match_candidate ~query ~candidate =
-  match find_positions ~query ~candidate with
+let match_prepared ~query ~candidate =
+  match find_positions_prepared ~query ~candidate with
   | None -> None
   | Some positions ->
       Some
         {
           candidate;
           positions;
-          score = Scoring.score ~query ~candidate ~positions;
+          score =
+            Scoring.score_prepared ~query:query.scoring_query ~candidate ~positions;
         }
+
+let match_candidate ~query ~candidate =
+  match_prepared ~query:(prepare_query query) ~candidate
 
 let matches ~query candidate =
   match find_positions ~query ~candidate with Some _ -> true | None -> false
 
+let matches_prepared ~query candidate =
+  match find_positions_prepared ~query ~candidate with Some _ -> true | None -> false
+
 let rank ~query candidates =
+  let query = prepare_query query in
   candidates
   |> List.mapi (fun original_index candidate ->
-         match find_positions ~query ~candidate with
+         match find_positions_prepared ~query ~candidate with
          | None -> None
          | Some positions ->
-             let matched =
-               Scoring.make_candidate_match ~candidate ~positions ~original_index
+             let computed_score =
+               Scoring.score_prepared ~query:query.scoring_query ~candidate ~positions
              in
-             Some matched)
+             Some
+               Scoring.{
+                 candidate;
+                 positions;
+                 score = computed_score;
+                 original_index;
+               })
   |> List.filter_map Fun.id
-  |> Scoring.rank ~query
+  |> List.sort Scoring.compare_scored
   |> List.map result_of_scored
 
 
 let rank_top ~query ~k candidates =
+  let query = prepare_query query in
   candidates
   |> List.mapi (fun original_index candidate ->
-         match find_positions ~query ~candidate with
+         match find_positions_prepared ~query ~candidate with
          | None -> None
          | Some positions ->
-             let matched =
-               Scoring.make_candidate_match ~candidate ~positions ~original_index
+             let computed_score =
+               Scoring.score_prepared ~query:query.scoring_query ~candidate ~positions
              in
-             Some matched)
+             Some
+               Topk.{
+                 value = { candidate; positions; score = computed_score };
+                 score = computed_score;
+                 original_index;
+               })
   |> List.filter_map Fun.id
-  |> Scoring.rank_top ~query ~k
-  |> List.map result_of_scored
+  |> Topk.of_list ~k
+  |> List.map (fun item -> item.Topk.value)

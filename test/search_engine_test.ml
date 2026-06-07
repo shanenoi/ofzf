@@ -14,6 +14,9 @@ let () =
   let limited = Ofzf.Search_engine.full_search ~limit:2 ~query:"mat" candidates in
   assert_equal_string_list "limited search matches ranking prefix"
     (take 2 (ranked_candidates "mat" candidates)) (candidate_names limited.results);
+  let empty = Ofzf.Search_engine.full_search ~query:"" [ "bb"; "a"; "" ] in
+  assert_equal_string_list "empty query keeps stable scoring semantics" [ ""; "a"; "bb" ]
+    (candidate_names empty.results);
   let first = Ofzf.Search_engine.incremental_search ~context:Ofzf.Search_engine.empty_context ~query:"m" candidates in
   let second = Ofzf.Search_engine.incremental_search ~context:first.context ~query:"ma" candidates in
   let third = Ofzf.Search_engine.incremental_search ~context:second.context ~query:"mat" candidates in

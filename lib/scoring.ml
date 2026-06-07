@@ -11,6 +11,12 @@ type scored_match = {
   original_index : int;
 }
 
+type prepared_query = {
+  value : string;
+  lower : string;
+  length : int;
+}
+
 type breakdown = {
   base : int;
   consecutive_bonus : int;
@@ -27,8 +33,18 @@ type breakdown = {
 let make_candidate_match ~candidate ~positions ~original_index =
   ({ candidate; positions; original_index } : candidate_match)
 
+let prepare_query value = {
+  value;
+  lower = String.lowercase_ascii value;
+  length = String.length value;
+}
+
 let is_ascii_lower = function 'a' .. 'z' -> true | _ -> false
 let is_ascii_upper = function 'A' .. 'Z' -> true | _ -> false
+
+let lowercase_ascii_char = function
+  | 'A' .. 'Z' as char -> Char.chr (Char.code char + 32)
+  | char -> char
 
 let is_separator = function
   | '/' | '-' | '_' | ' ' | '.' | ':' | '\t' -> true
@@ -88,21 +104,32 @@ let gap_penalty positions =
   in
   loop None 0 positions
 
-let lowercase_ascii value = String.lowercase_ascii value
+let equals_query_ignore_case ~query candidate =
+  String.length candidate = query.length
+  &&
+  let rec loop index =
+    if index = query.length then true
+    else if lowercase_ascii_char candidate.[index] <> query.lower.[index] then false
+    else loop (index + 1)
+  in
+  loop 0
 
-let starts_with ~prefix value =
-  let prefix_length = String.length prefix in
-  String.length value >= prefix_length
-  && String.sub value 0 prefix_length = prefix
+let starts_with_query_ignore_case ~query candidate =
+  String.length candidate >= query.length
+  &&
+  let rec loop index =
+    if index = query.length then true
+    else if lowercase_ascii_char candidate.[index] <> query.lower.[index] then false
+    else loop (index + 1)
+  in
+  loop 0
 
-let exact_bonus ~query ~candidate =
-  if lowercase_ascii query = lowercase_ascii candidate then 160 else 0
+let exact_bonus_prepared ~query ~candidate =
+  if equals_query_ignore_case ~query candidate then 160 else 0
 
-let prefix_bonus ~query ~candidate =
-  let query_lower = lowercase_ascii query in
-  let candidate_lower = lowercase_ascii candidate in
-  if query_lower = "" then 0
-  else if starts_with ~prefix:query_lower candidate_lower then 80
+let prefix_bonus_prepared ~query ~candidate =
+  if query.length = 0 then 0
+  else if starts_with_query_ignore_case ~query candidate then 80
   else 0
 
 let path_penalty candidate positions =
@@ -115,13 +142,39 @@ let path_penalty candidate positions =
       done;
       !slash_count * 16
 
-let score_breakdown ~query ~candidate ~positions =
-  let base = String.length query * 100 in
+let consecutive_and_gap_penalty positions =
+  let rec loop previous consecutive_total gap_total = function
+    | [] -> (consecutive_total, gap_total)
+    | position :: rest ->
+        let consecutive, gap =
+          match previous with
+          | Some previous when position = previous + 1 -> (32, 0)
+          | Some previous -> (0, max 0 (position - previous - 1) * 8)
+          | None -> (0, 0)
+        in
+        loop (Some position) (consecutive_total + consecutive) (gap_total + gap) rest
+  in
+  loop None 0 0 positions
+
+let score_total ~query ~candidate ~positions =
+  let base = query.length * 100 in
+  let consecutive_bonus, gap_penalty = consecutive_and_gap_penalty positions in
+  let boundary_bonus = boundary_bonus candidate positions in
+  let early_bonus = early_bonus positions in
+  let exact_bonus = exact_bonus_prepared ~query ~candidate in
+  let prefix_bonus = prefix_bonus_prepared ~query ~candidate in
+  let path_penalty = path_penalty candidate positions in
+  let length_penalty = String.length candidate in
+  base + consecutive_bonus + boundary_bonus + early_bonus + exact_bonus
+  + prefix_bonus - gap_penalty - path_penalty - length_penalty
+
+let score_breakdown_prepared ~query ~candidate ~positions =
+  let base = query.length * 100 in
   let consecutive_bonus = consecutive_bonus positions in
   let boundary_bonus = boundary_bonus candidate positions in
   let early_bonus = early_bonus positions in
-  let exact_bonus = exact_bonus ~query ~candidate in
-  let prefix_bonus = prefix_bonus ~query ~candidate in
+  let exact_bonus = exact_bonus_prepared ~query ~candidate in
+  let prefix_bonus = prefix_bonus_prepared ~query ~candidate in
   let gap_penalty = gap_penalty positions in
   let path_penalty = path_penalty candidate positions in
   let length_penalty = String.length candidate in
@@ -142,14 +195,20 @@ let score_breakdown ~query ~candidate ~positions =
     total;
   }
 
+let score_breakdown ~query ~candidate ~positions =
+  score_breakdown_prepared ~query:(prepare_query query) ~candidate ~positions
+
 let score ~query ~candidate ~positions =
-  (score_breakdown ~query ~candidate ~positions).total
+  score_total ~query:(prepare_query query) ~candidate ~positions
+
+let score_prepared ~query ~candidate ~positions = score_total ~query ~candidate ~positions
 
 let score_match ~query (matched : candidate_match) =
+  let query = prepare_query query in
   let candidate = matched.candidate in
   let positions = matched.positions in
   let original_index = matched.original_index in
-  let score = score ~query ~candidate ~positions in
+  let score = score_prepared ~query ~candidate ~positions in
   {
     candidate;
     positions;
@@ -163,12 +222,25 @@ let compare_scored left right =
   | by_score -> by_score
 
 let rank ~query matches =
-  matches |> List.map (score_match ~query) |> List.sort compare_scored
+  let query = prepare_query query in
+  matches
+  |> List.map (fun (matched : candidate_match) ->
+         let candidate = matched.candidate in
+         let positions = matched.positions in
+         let original_index = matched.original_index in
+         let score = score_prepared ~query ~candidate ~positions in
+         { candidate; positions; score; original_index })
+  |> List.sort compare_scored
 
 let rank_top ~query ~k matches =
+  let query = prepare_query query in
   matches
-  |> List.map (fun matched ->
-         let scored = score_match ~query matched in
+  |> List.map (fun (matched : candidate_match) ->
+         let candidate = matched.candidate in
+         let positions = matched.positions in
+         let original_index = matched.original_index in
+         let score = score_prepared ~query ~candidate ~positions in
+         let scored : scored_match = { candidate; positions; score; original_index } in
          let score = scored.score in
          let original_index = scored.original_index in
          { Topk.value = scored; score; original_index })
