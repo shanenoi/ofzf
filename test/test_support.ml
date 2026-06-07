@@ -115,6 +115,7 @@ let shell_quote value =
   Buffer.contents buffer
 
 type process_result = {
+  command : string;
   status : Unix.process_status;
   stdout : string;
   stderr : string;
@@ -126,14 +127,68 @@ let run_shell command =
       let stderr_path = Filename.concat dir "stderr" in
       let status = Sys.command (command ^ " > " ^ shell_quote stdout_path ^ " 2> " ^ shell_quote stderr_path) in
       let status = if status = 0 then Unix.WEXITED 0 else Unix.WEXITED status in
-      { status; stdout = read_file stdout_path; stderr = read_file stderr_path })
+      { command; status; stdout = read_file stdout_path; stderr = read_file stderr_path })
 
 let exit_code = function
   | Unix.WEXITED code -> code
   | Unix.WSIGNALED signal -> 128 + signal
   | Unix.WSTOPPED signal -> 128 + signal
 
-let ofzf_binary () = Sys.getenv_opt "OFZF_TEST_BIN"
+let process_result_details result =
+  Printf.sprintf "command: %s\nexit status: %d\nstdout:\n%s\nstderr:\n%s" result.command
+    (exit_code result.status) result.stdout result.stderr
+
+let assert_process_exit message expected result =
+  if exit_code result.status <> expected then
+    failwith
+      (Printf.sprintf "%s: expected exit %d, got %d\n%s" message expected
+         (exit_code result.status) (process_result_details result))
+
+let assert_process_not_exit message unexpected result =
+  if exit_code result.status = unexpected then
+    failwith
+      (Printf.sprintf "%s: expected exit other than %d\n%s" message unexpected
+         (process_result_details result))
+
+let assert_process_stdout message expected result =
+  if result.stdout <> expected then
+    failwith
+      (Printf.sprintf "%s: expected stdout %S, got %S\n%s" message expected
+         result.stdout (process_result_details result))
+
+let assert_process_stderr message expected result =
+  if result.stderr <> expected then
+    failwith
+      (Printf.sprintf "%s: expected stderr %S, got %S\n%s" message expected
+         result.stderr (process_result_details result))
+
+let assert_process_stdout_contains message ~needle result =
+  if not (contains ~needle result.stdout) then
+    failwith
+      (Printf.sprintf "%s: expected stdout to contain %S\n%s" message needle
+         (process_result_details result))
+
+let assert_process_stderr_contains message ~needle result =
+  if not (contains ~needle result.stderr) then
+    failwith
+      (Printf.sprintf "%s: expected stderr to contain %S\n%s" message needle
+         (process_result_details result))
+
+let assert_process_stdout_empty message result =
+  assert_process_stdout message "" result
+
+let assert_process_stderr_empty message result =
+  assert_process_stderr message "" result
+
+let ofzf_binary () =
+  match Sys.getenv_opt "OFZF_TEST_BIN" with
+  | Some bin when bin <> "" && Sys.file_exists bin -> bin
+  | Some bin when bin <> "" ->
+      failwith (Printf.sprintf "OFZF_TEST_BIN points to a missing binary: %s" bin)
+  | _ ->
+      failwith
+        "OFZF_TEST_BIN is not set. Run process-level CLI tests through `dune \
+         runtest`, which builds bin/main.exe and sets OFZF_TEST_BIN."
 
 let fixture_dir () =
   let candidates =

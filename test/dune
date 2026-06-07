@@ -1,4 +1,14 @@
 (tests
- (names matcher_test scoring_test topk_test cli_test text_width_test preview_test interactive_test terminal_test render_test query_edit_test selection_test viewport_test preview_state_test search_engine_test query_cache_test cli_process_test)
+ (names matcher_test scoring_test topk_test cli_test text_width_test preview_test interactive_test terminal_test render_test query_edit_test selection_test viewport_test preview_state_test search_engine_test query_cache_test)
  (libraries ofzf unix)
  (deps (source_tree fixtures)))
+
+(test
+ (name cli_process_test)
+ (libraries ofzf unix)
+ (deps
+  (source_tree fixtures)
+  (:ofzf_bin ../bin/main.exe))
+ (action
+  (setenv OFZF_TEST_BIN %{ofzf_bin}
+   (run %{test}))))

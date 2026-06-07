@@ -29,6 +29,7 @@ filesystem.
 ## Test ownership
 
 Each major module now has a focused test file under `test/`. Process-level CLI
-coverage is in `test/cli_process_test.ml` and runs only when `OFZF_TEST_BIN`
-points at a compiled binary, keeping normal pure test runs independent of a real
-TTY or Dune-built executable path.
+coverage is in `test/cli_process_test.ml`; the default Dune test workflow builds
+the real executable and provides its path through `OFZF_TEST_BIN`. Those smoke
+tests still avoid a real interactive TTY and keep parser-only coverage separate
+from executable behavior checks.

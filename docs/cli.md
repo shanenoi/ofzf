@@ -197,7 +197,11 @@ contents and large candidate lists.
 
 ## Process-level smoke tests
 
-`test/cli_process_test.ml` can exercise a compiled `ofzf` binary when
-`OFZF_TEST_BIN` is set. This keeps normal pure unit tests independent of Dune's
-build directory while still allowing regression checks for stdout/stderr and
-exit status behavior.
+`make test` runs `test/cli_process_test.ml` against the real `ofzf` executable by
+default. The Dune test stanza builds `bin/main.exe`, sets `OFZF_TEST_BIN` for the
+process test, and keeps parser-only tests separate from executable smoke tests.
+
+The process tests cover ranked search output, `--limit`, `--limit 0`, `--bench`,
+debug stderr behavior, invalid CLI combinations, and preview validation that can
+fail safely without a real interactive terminal. Search results remain on stdout;
+usage, validation, debug, and terminal-startup messages remain on stderr.

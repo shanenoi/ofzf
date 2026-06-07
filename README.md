@@ -13,7 +13,7 @@ original non-interactive fuzzy-filter behavior.
 
 ## Current status
 
-Implemented through v0.13 Terminal Size + Resize Hardening plus three
+Implemented through v0.14 Process-Level CLI Test Stabilization plus three
 technical-debt stabilization passes:
 
 - Case-insensitive subsequence fuzzy matching.
@@ -63,8 +63,8 @@ technical-debt stabilization passes:
   incremental-session memory growth.
 - The search-engine path carries successful matches through ranking so it avoids
   matching once for filtering and again for ranking where practical.
-- The test suite is split by module/feature ownership and includes optional
-  process-level CLI smoke tests when `OFZF_TEST_BIN` points at a compiled binary.
+- The test suite is split by module/feature ownership and includes default
+  process-level CLI smoke tests that build and exercise the real `ofzf` binary.
 - `OFZF_DEBUG=1` enables concise debug logs on stderr without changing normal
   stdout output.
 - Preview panes classify directories, missing paths, unreadable files, and
@@ -141,11 +141,9 @@ The test suite is split by module responsibility. `Interactive` keeps terminal
 lifecycle and event-loop wiring, while pure behavior lives in focused modules
 that can be tested without a real TTY.
 
-Process-level CLI smoke tests can be run against a compiled binary by setting:
-
-```sh
-OFZF_TEST_BIN=_build/default/bin/main.exe dune runtest
-```
+`make test` also runs process-level CLI smoke tests against the real executable.
+Those tests assert stdout/stderr separation, search output, `--limit`, `--bench`,
+and argument-validation behavior without requiring a real interactive terminal.
 
 Debug logging is opt-in and writes only to stderr:
 
