@@ -13,14 +13,14 @@ original non-interactive fuzzy-filter behavior.
 
 ## Current status
 
-Implemented through v0.15 Search Hot Path Optimization plus three
+Implemented through v0.16 Heap-Based Top-K plus three
 technical-debt stabilization passes:
 
 - Case-insensitive subsequence fuzzy matching.
 - Match positions for future highlighting.
 - Numeric scoring with consecutive, boundary, early-match, gap, exact-match, prefix, path-depth, and length signals.
 - Stable ranking that preserves input order for equal scores.
-- Top-k ranking support without fully sorting all matches.
+- Heap-backed top-k ranking support without fully sorting all matches.
 - Streaming CLI that processes stdin line-by-line.
 - `--limit N` for bounded top-k output.
 - Query cache and incremental search engine for future interactive narrowing.

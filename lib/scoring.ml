@@ -232,8 +232,9 @@ let rank ~query matches =
 
 let rank_top ~query ~k matches =
   let query = prepare_query query in
+  let best = Topk.create ~k () in
   matches
-  |> List.map (fun (matched : candidate_match) ->
+  |> List.iter (fun (matched : candidate_match) ->
          let candidate = matched.candidate in
          let positions = matched.positions in
          let original_index = matched.original_index in
@@ -241,6 +242,5 @@ let rank_top ~query ~k matches =
          let scored : scored_match = { candidate; positions; score; original_index } in
          let score = scored.score in
          let original_index = scored.original_index in
-         { Topk.value = scored; score; original_index })
-  |> Topk.of_list ~k
-  |> List.map (fun item -> item.Topk.value)
+         Topk.push best { Topk.value = scored; score; original_index });
+  best |> Topk.to_sorted_list |> List.map (fun item -> item.Topk.value)

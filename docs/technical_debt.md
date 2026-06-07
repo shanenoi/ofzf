@@ -4,7 +4,9 @@ Technical Debt Pass 3 keeps the Pass 2 module split, reorganizes tests by module
 ownership, adds process-level CLI smoke tests, and introduces minimal debug
 logging for future troubleshooting. v0.14 promotes that process-level coverage
 into the default Dune test workflow. v0.15 keeps ranking behavior stable while
-reducing repeated query/candidate normalization on the search hot path.
+reducing repeated query/candidate normalization on the search hot path. v0.16
+replaces the streaming Top-K bounded-list path with a heap-backed accumulator for
+large-limit performance.
 
 Completed in this pass:
 
@@ -25,18 +27,19 @@ Completed in this pass:
   ranking policy into CLI or interactive code;
 - matching avoids lowercase candidate-string allocation and rejects candidates
   shorter than the query before scanning;
+- top-k selection now uses a heap accumulator while preserving final best-first
+  ordering and stable tie behavior;
 - small preview fixtures cover Unicode names, long names, CRLF, binary-looking
   content, directories, and missing paths;
 - `OFZF_DEBUG=1` writes concise diagnostics to stderr without changing stdout.
 
 Deferred work:
 
-- heap-based Top-K for large `K`;
 - full grapheme-aware query editing;
 - command-based preview with a safe command model.
 
 Recommended next cleanup order:
 
-1. add a heap-backed Top-K implementation for large `K`;
-2. add command-preview design docs before implementing any shell-facing feature;
-3. revisit query editing with full grapheme-cluster behavior.
+1. add command-preview design docs before implementing any shell-facing feature;
+2. revisit query editing with full grapheme-cluster behavior;
+3. consider top-k threshold bailouts after collecting real-world benchmark data.

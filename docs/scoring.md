@@ -154,8 +154,8 @@ This is important for shell pipelines because the input order may already encode
 useful information from tools such as `find`, `git ls-files`, or `rg --files`.
 
 `Scoring.rank_top` uses the same comparison but keeps only the best `K` results.
-The streaming CLI uses `Topk.add` directly with the same comparison data, so
-limited output has the same order as the first `K` results from a full rank.
+The streaming CLI uses `Topk`'s heap accumulator with the same comparison data,
+so limited output has the same order as the first `K` results from a full rank.
 
 ## Complexity analysis
 
@@ -166,7 +166,7 @@ For a query of length `q`, candidate length `n`, and `m` candidates:
   walks match positions and counts path separators before the first match;
 - filtering all candidates is `O(total_input_characters)`;
 - sorting `k` matching candidates is `O(k log k)`;
-- bounded top-k is `O(k * K)` for the current insertion-list implementation;
+- bounded top-k is `O(k log K)` for the heap-backed implementation;
 - score memory is `O(k)` plus the stored position lists.
 
 The scoring model does not use dynamic programming, edit distance, or
@@ -179,7 +179,6 @@ Later milestones can improve speed without changing CLI behavior:
 1. Cache lowercased candidates between query updates.
 2. Store path metadata such as basename start and slash count once per candidate.
 3. Use arrays instead of lists for positions in the hottest path.
-4. Replace bounded-list top-k with a heap for large `K`.
-5. Parallelize matching and scoring across chunks.
-6. Add early bailouts when a candidate cannot beat the current top-k threshold.
-7. Tune constants against real file lists and source-code paths.
+4. Parallelize matching and scoring across chunks.
+5. Add early bailouts when a candidate cannot beat the current top-k threshold.
+6. Tune constants against real file lists and source-code paths.

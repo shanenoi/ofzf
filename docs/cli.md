@@ -95,9 +95,9 @@ preserve upstream order.
 The full-ranking path still needs to keep every matching line because it must
 sort all matches before output. It does not need to keep non-matching candidates.
 
-The limited path keeps only the current best `N` matches with `Topk.add`. This
-means `ofzf --limit N QUERY` does not retain all matches and can process large
-streams with memory bounded mostly by `N` and candidate size.
+The limited path keeps only the current best `N` matches with a `Topk` heap
+accumulator. This means `ofzf --limit N QUERY` does not retain all matches and
+can process large streams with memory bounded mostly by `N` and candidate size.
 
 ## Memory behavior
 
@@ -119,8 +119,9 @@ Full ranking is best when callers need every matching line. It costs
 `O(m log m)` to sort all matches and uses `O(m)` memory.
 
 Limited ranking is best when callers need only the first page of results or a
-small batch. The current bounded-list implementation costs `O(m * K)` and uses
-`O(K)` memory. For small limits this avoids unnecessary allocation and sorting.
+small batch. The heap-backed implementation costs `O(m log K)` and uses `O(K)`
+memory. This avoids retaining or fully sorting every match while preserving the
+same ordered prefix as full ranking.
 
 ## Stable ordering
 

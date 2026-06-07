@@ -78,15 +78,16 @@ let subset_of_matched matched =
 let rank_matched ?limit matched =
   match limit with
   | Some k ->
+      let best = Topk.create ~k () in
       matched
-      |> List.map (fun matched ->
-             {
-               Topk.value = matched.result;
-               score = matched.result.Matcher.score;
-               original_index = matched.original_index;
-             })
-      |> Topk.of_list ~k
-      |> List.map (fun item -> item.Topk.value)
+      |> List.iter (fun matched ->
+             Topk.push best
+               {
+                 Topk.value = matched.result;
+                 score = matched.result.Matcher.score;
+                 original_index = matched.original_index;
+               });
+      best |> Topk.to_sorted_list |> List.map (fun item -> item.Topk.value)
   | None ->
       matched
       |> List.stable_sort (fun left right ->

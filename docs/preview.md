@@ -113,6 +113,6 @@ controlled command model in a later milestone.
 - No shell integration or placeholder expansion.
 - No multi-select interaction with preview yet.
 
-The current Top-K implementation remains a bounded sorted list. It is stable and
-simple for small `K`, while a heap-based implementation remains future work for
-large limits.
+Top-K selection is heap-backed, stable, and bounded to `O(K)` retained results.
+Preview rendering consumes already-ranked results and does not depend on the
+heap internals.

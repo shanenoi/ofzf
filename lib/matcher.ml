@@ -102,20 +102,19 @@ let rank ~query candidates =
 
 let rank_top ~query ~k candidates =
   let query = prepare_query query in
+  let best = Topk.create ~k () in
   candidates
-  |> List.mapi (fun original_index candidate ->
+  |> List.iteri (fun original_index candidate ->
          match find_positions_prepared ~query ~candidate with
-         | None -> None
+         | None -> ()
          | Some positions ->
              let computed_score =
                Scoring.score_prepared ~query:query.scoring_query ~candidate ~positions
              in
-             Some
-               Topk.{
+             Topk.push best
+               {
                  value = { candidate; positions; score = computed_score };
                  score = computed_score;
                  original_index;
-               })
-  |> List.filter_map Fun.id
-  |> Topk.of_list ~k
-  |> List.map (fun item -> item.Topk.value)
+               });
+  best |> Topk.to_sorted_list |> List.map (fun item -> item.Topk.value)

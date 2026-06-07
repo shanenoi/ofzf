@@ -89,7 +89,7 @@ For full input size `N`, previous matching subset size `P`, final match count
 - incremental prefix matching scans `O(P)` candidate bytes;
 - exact cache hits scan `O(0)` candidates and re-rank cached matches;
 - full ranking costs `O(m log m)`;
-- top-k ranking costs `O(m * K)` with the current bounded-list implementation;
+- top-k ranking costs `O(m log K)` with the heap-backed implementation;
 - context memory is proportional to the bounded cached matching subsets.
 
 Incremental search is most valuable when each typed character sharply reduces

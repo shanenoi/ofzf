@@ -8,7 +8,7 @@ larger features such as multi-select or command-based previews.
 | --- | --- | --- |
 | `Matcher` | Case-insensitive subsequence matching, byte match positions, and prepared-query matching helpers. | ANSI rendering, terminal state, filesystem access. |
 | `Scoring` | Numeric relevance scoring, stable ranking order, and prepared-query scoring helpers. | Candidate IO, terminal UI. |
-| `Topk` | Bounded stable best-K container. | Matching or scoring policy. |
+| `Topk` | Bounded stable best-K heap and sorted finalization. | Matching or scoring policy. |
 | `Search_engine` | Full/incremental search orchestration and search statistics. | Terminal rendering, raw mode, preview loading. |
 | `Query_cache` | Exact/prefix query result reuse and bounded cache memory. | Ranking, terminal UI. |
 | `Query_edit` | Pure query text edits. | Terminal raw-mode reads or ANSI rendering. |

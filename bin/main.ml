@@ -42,19 +42,21 @@ let run_full query =
 
 let run_limited query limit =
   let prepared_query = Ofzf.Matcher.prepare_query query in
-  let rec loop index best =
+  let best = Ofzf.Topk.create ~k:limit () in
+  let rec loop index =
     match input_line stdin with
     | line -> (
         match Ofzf.Matcher.match_prepared ~query:prepared_query ~candidate:line with
-        | None -> loop (index + 1) best
+        | None -> loop (index + 1)
         | Some result ->
-            loop (index + 1) (Ofzf.Topk.add ~k:limit best (scored_item index result)))
+            Ofzf.Topk.push best (scored_item index result);
+            loop (index + 1))
     | exception End_of_file ->
         Ofzf.Debug.logf "limited-search scanned=%d retained=%d limit=%d" index
-          (List.length best) limit;
-        List.iter output_result best
+          (Ofzf.Topk.length best) limit;
+        best |> Ofzf.Topk.to_sorted_list |> List.iter output_result
   in
-  loop 0 []
+  loop 0
 
 let prefixes query =
   let rec loop length acc =

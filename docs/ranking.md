@@ -32,8 +32,9 @@ comparison as full ranking:
 1. higher score first;
 2. lower original input index first when scores tie.
 
-The current implementation is a bounded sorted list. Each inserted item is
-placed into the current best list and the list is trimmed to size `K`.
+The current implementation is a bounded heap. The heap retains at most `K`
+items, keeps the weakest retained item at the root, skips candidates that cannot
+improve the retained set, and sorts only the retained items at the end.
 
 For interactive fuzzy finding, this matters because the UI usually needs only
 visible rows plus a small buffer. Sorting 100,000 matches just to render 40 rows
@@ -50,16 +51,12 @@ its `original_index`, which is assigned from the original stdin order.
 For `k` matching candidates and requested size `K`:
 
 - full sorting costs `O(k log k)`;
-- current top-k costs `O(k * K)`;
+- current top-k costs `O(k log K)`;
 - top-k memory is `O(K)` plus the current input line being processed.
 
-For small UI-oriented or CLI `K`, bounded insertion is simple and effective. A
-future heap can improve large-`K` behavior to `O(k log K)` without changing
-callers.
-
-Technical Debt Pass 2 kept this stable implementation and expanded benchmark
-coverage instead of replacing it. Heap-based Top-K remains the preferred next
-step only after benchmarks show large `K` is a real bottleneck.
+For small UI-oriented or CLI `K`, the heap has similar output behavior to the old
+bounded-list path. For larger `K`, it avoids the previous `O(k * K)` insertion
+cost without changing ranking semantics.
 
 ## Streaming CLI tradeoff
 

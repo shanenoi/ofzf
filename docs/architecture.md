@@ -8,7 +8,7 @@ stdin line stream + argv query/options
   -> bin/main.ml
   -> Ofzf.Cli.parse
   -> Ofzf.Matcher.match_candidate per line
-  -> full sort or Topk.add
+  -> full sort or Topk heap accumulator
   -> ranked matching lines on stdout
 
 interactive mode:
@@ -78,9 +78,11 @@ calculation to `Scoring`.
 
 ### Top-k library
 
-`lib/topk.ml` maintains a bounded list of the best results. It orders by score
-descending and then by original input index ascending. The CLI uses `Topk.add`
-for `--limit N`, so limited searches do not retain every matching candidate.
+`lib/topk.ml` maintains a bounded heap of the best results. It keeps the weakest
+retained item at the internal heap root, then returns sorted best-first results
+at the end. It orders by score descending and then by original input index
+ascending. The CLI uses the heap accumulator for `--limit N`, so limited
+searches do not retain every matching candidate.
 
 ### Query editing
 
@@ -242,8 +244,8 @@ For `m` candidates, total input size `N`, query length `q`, and `k` matches:
 - matching is `O(N)`;
 - scoring is `O(k * q)`;
 - full ranking is `O(k log k)` and stores `O(k)` matched results;
-- top-k streaming is `O(k * K)` with the current small bounded-list
-  implementation, where `K` is the requested result count;
+- top-k streaming is `O(k log K)` with a heap accumulator, where `K` is the
+  requested result count;
 - full CLI memory is `O(k)` retained matches;
 - limited CLI memory is `O(K)` retained matches;
 - incremental prefix searches scan `O(p)` candidate bytes where `p` is the
@@ -253,8 +255,8 @@ For `m` candidates, total input size `N`, query length `q`, and `k` matches:
   current prompt and result rows, not in the full result set.
 
 The top-k implementation avoids allocating a full sorted result list when a
-caller only needs the best `K` candidates. A future heap can reduce the top-k
-bound to `O(k log K)` while preserving the same public API.
+caller only needs the best `K` candidates. The heap-backed path keeps the bound
+at `O(k log K)` while preserving stable final ordering.
 
 Interactive mode loads candidates into memory once before entering raw mode, so
 future keystrokes can use the incremental search engine. Rendering cost is
@@ -270,12 +272,11 @@ The architecture leaves room for fzf-style speed improvements:
 1. Replace list positions with arrays or reusable buffers on hot paths.
 2. Add candidate IDs for lower incremental memory overhead.
 3. Cache normalized candidate metadata in future interactive sessions.
-4. Upgrade top-k from bounded insertion list to a binary heap for large `K`.
-5. Add early bailouts when a candidate cannot beat the top-k threshold.
-6. Parallelize scoring across chunks for non-streaming batch use cases.
-7. Improve terminal redraw minimality and add signal-driven resize handling.
-8. Cache pre-rendered candidate fragments for large interactive result sets.
-9. Add command-based preview and multi-select only after the safe preview core is stable.
+4. Add early bailouts when a candidate cannot beat the top-k threshold.
+5. Parallelize scoring across chunks for non-streaming batch use cases.
+6. Improve terminal redraw minimality.
+7. Cache pre-rendered candidate fragments for large interactive result sets.
+8. Add command-based preview and multi-select only after the safe preview core is stable.
 
 ### Preview foundation
 
