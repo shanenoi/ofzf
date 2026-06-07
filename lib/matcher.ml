@@ -5,14 +5,12 @@ type match_result = {
 }
 
 type prepared_query = {
-  value : string;
   lower : string;
   length : int;
   scoring_query : Scoring.prepared_query;
 }
 
 let prepare_query value = {
-  value;
   lower = String.lowercase_ascii value;
   length = String.length value;
   scoring_query = Scoring.prepare_query value;

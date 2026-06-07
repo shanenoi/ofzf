@@ -12,7 +12,6 @@ type scored_match = {
 }
 
 type prepared_query = {
-  value : string;
   lower : string;
   length : int;
 }
@@ -34,7 +33,6 @@ let make_candidate_match ~candidate ~positions ~original_index =
   ({ candidate; positions; original_index } : candidate_match)
 
 let prepare_query value = {
-  value;
   lower = String.lowercase_ascii value;
   length = String.length value;
 }

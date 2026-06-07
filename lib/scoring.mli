@@ -13,7 +13,7 @@ type candidate_match = {
 type prepared_query
 
 val prepare_query : string -> prepared_query
-  (** [prepare_query query] stores [query] and its ASCII-lowercase form for
+  (** [prepare_query query] stores the ASCII-lowercase query and its length for
       repeated scoring. *)
 
 val make_candidate_match :
