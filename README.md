@@ -162,3 +162,7 @@ dune exec bench/benchmark.exe -- --limit 20 mat < candidates.txt
 The benchmark prints candidate count, query length, limit, full-search timing,
 incremental timing, candidate reduction ratio, cache hits/misses, and reuse
 counts.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
