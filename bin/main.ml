@@ -7,11 +7,11 @@ let mode_to_string = function
   | Ofzf.Cli.Interactive -> "interactive"
 
 let log_config (config : Ofzf.Cli.config) =
-  Ofzf.Debug.logf "mode=%s query_length=%d limit=%s preview=%b"
+  Ofzf.Debug.logf "mode=%s query_length=%d limit=%s preview=%b multi=%b"
     (mode_to_string config.mode)
     (String.length config.query)
     (match config.limit with None -> "none" | Some limit -> string_of_int limit)
-    config.preview
+    config.preview config.multi
 
 let scored_item original_index (result : Ofzf.Matcher.match_result) =
   Ofzf.Topk.{ value = result; score = result.score; original_index }
@@ -101,7 +101,7 @@ let () =
   | Error error ->
       print_usage_error program error;
       exit 2
-  | Ok ({ mode = Interactive; query; preview; preview_position; _ } as config) ->
+  | Ok ({ mode = Interactive; query; preview; preview_position; multi; _ } as config) ->
       log_config config;
       let candidates = read_all_stdin () in
       Ofzf.Debug.logf "interactive candidates=%d" (List.length candidates);
@@ -110,7 +110,7 @@ let () =
         | Ofzf.Cli.Preview_right -> Ofzf.Preview.Right
         | Ofzf.Cli.Preview_bottom -> Ofzf.Preview.Bottom
       in
-      exit (Ofzf.Interactive.run ~preview ~preview_position ~initial_query:query ~candidates)
+      exit (Ofzf.Interactive.run ~preview ~multi ~preview_position ~initial_query:query ~candidates)
   | Ok ({ query; limit; mode = Bench; _ } as config) ->
       log_config config;
       run_bench query limit

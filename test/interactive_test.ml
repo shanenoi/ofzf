@@ -27,6 +27,8 @@ let () =
   assert_equal_int "result rows tiny terminal" 0 (Ofzf.Interactive.result_rows ~terminal_height:1);
   assert_equal_string "character edits query" "m"
     (Ofzf.Interactive.apply_key_to_query (Ofzf.Terminal.Character 'm') ~query:"");
+  assert_equal_string "space edits query in single-select editing" "ab "
+    (Ofzf.Interactive.apply_key_to_query (Ofzf.Terminal.Character ' ') ~query:"ab");
   assert_equal_string "backspace edits query" "ma"
     (Ofzf.Interactive.apply_key_to_query Ofzf.Terminal.Backspace ~query:"mat");
   assert_equal_string "backspace empty query safe" ""
@@ -62,4 +64,11 @@ let () =
   let result = require_match "mat" "matcher.ml" in
   let some_selected, some_code = Ofzf.Interactive.selected_result ~selected:0 [ result ] in
   assert_true "enter with result selects it" (some_selected = Some result);
-  assert_equal_int "enter with result exits successfully" 0 some_code
+  assert_equal_int "enter with result exits successfully" 0 some_code;
+  assert_equal_string_list "interactive toggles candidate selection" [ "help" ]
+    (Ofzf.Interactive.toggle_candidate_selection ~candidates:[ "hello"; "help" ]
+       ~candidate:"help" ~marked:[]);
+  assert_equal_string_list "interactive multi enter falls back to highlighted" [ "matcher.ml" ]
+    (fst
+       (Ofzf.Interactive.selected_candidate_outputs ~candidates:[ "matcher.ml" ] ~marked:[]
+          ~selected:0 [ result ]))

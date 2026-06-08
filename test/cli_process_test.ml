@@ -71,6 +71,16 @@ let () =
   assert_error "preview limit" (run_ofzf bin "--preview --limit 1 he")
     ~needle:"cannot be combined with --limit";
 
+  assert_error "multi bench" (run_ofzf bin "--multi --bench he")
+    ~needle:"cannot be combined with --bench";
+
+  assert_error "multi limit" (run_ofzf bin "--multi --limit 1 he")
+    ~needle:"cannot be combined with --limit";
+
+  let multi_initial_query = run_ofzf bin "--multi he" in
+  assert_error "multi initial query non-tty" multi_initial_query
+    ~needle:"cannot start interactive terminal";
+
   let preview_right = run_ofzf bin "--preview --preview-position right he" in
   assert_error "preview right non-tty" preview_right ~needle:"cannot start interactive terminal";
 

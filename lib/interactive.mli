@@ -42,7 +42,7 @@ val apply_key_to_selection : ?page_size:int -> Terminal.key -> selected:int -> r
 val preview_scroll_delta : visible_rows:int -> Terminal.key -> int option
 (** Preview-scroll delta for keys that control the preview pane. *)
 
-val format_status : preview:bool -> result_count:int -> selected:int -> string
+val format_status : multi_selected_count:int option -> preview:bool -> result_count:int -> selected:int -> string
 (** Human-readable status line for the current result set. *)
 
 val empty_results_message : query:string -> string
@@ -56,7 +56,8 @@ val render_candidate_clipped :
 (** Render one candidate clipped to terminal width while preserving matched-byte
     highlighting inside the visible range. *)
 
-val render_result_line : ?terminal_width:int -> selected:bool -> Matcher.match_result -> string
+val render_result_line :
+  ?terminal_width:int -> ?multi:bool -> ?marked:bool -> selected:bool -> Matcher.match_result -> string
 (** Render one result row, including selected-row styling when requested. *)
 
 val render_preview_pane :
@@ -70,6 +71,8 @@ val render_lines :
   ?preview_position:Preview.position ->
   ?preview_content:Preview.content ->
   ?preview_scroll:int ->
+  ?marked_candidates:string list ->
+  ?multi_selected_count:int ->
   terminal_height:int ->
   query:string ->
   selected:int ->
@@ -82,6 +85,13 @@ val render_lines :
 val selected_result : selected:int -> Matcher.match_result list -> (Matcher.match_result option * int)
 (** Enter-key result helper. Returns [(Some result, 0)] when a result exists and
     [(None, 1)] when Enter is pressed with no selectable result. *)
+
+val toggle_candidate_selection : candidates:string list -> candidate:string -> marked:string list -> string list
+(** Toggle one candidate in the multi-select marked set. *)
+
+val selected_candidate_outputs :
+  candidates:string list -> marked:string list -> selected:int -> Matcher.match_result list -> string list * int
+(** Multi-select Enter-key result helper. *)
 
 val preview_visible_rows :
   terminal_height:int -> terminal_width:int -> preview:bool -> preview_position:Preview.position -> int
@@ -97,5 +107,6 @@ val update_preview_state :
 val clamp_preview_state_scroll : visible_rows:int -> preview_state -> preview_state
 (** Clamp preview scroll based on already-loaded content. *)
 
-val run : preview:bool -> preview_position:Preview.position -> initial_query:string -> candidates:string list -> int
+val run :
+  preview:bool -> multi:bool -> preview_position:Preview.position -> initial_query:string -> candidates:string list -> int
 (** Run interactive mode. Returns the intended process exit code. *)

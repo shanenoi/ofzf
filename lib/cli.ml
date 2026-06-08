@@ -8,6 +8,7 @@ type config = {
   mode : mode;
   preview : bool;
   preview_position : preview_position;
+  multi : bool;
 }
 
 type error =
@@ -19,6 +20,8 @@ type error =
   | Preview_position_without_preview
   | Preview_conflicts_with_bench
   | Preview_conflicts_with_limit
+  | Multi_conflicts_with_bench
+  | Multi_conflicts_with_limit
 
 type raw_config = {
   raw_query : string option;
@@ -26,14 +29,22 @@ type raw_config = {
   raw_bench : bool;
   raw_preview : bool;
   raw_preview_position : preview_position option;
+  raw_multi : bool;
 }
 
 let empty_raw =
-  { raw_query = None; raw_limit = None; raw_bench = false; raw_preview = false; raw_preview_position = None }
+  {
+    raw_query = None;
+    raw_limit = None;
+    raw_bench = false;
+    raw_preview = false;
+    raw_preview_position = None;
+    raw_multi = false;
+  }
 
 let usage program =
   Printf.sprintf
-    "usage: %s [--bench] [--limit N] [--preview] [--preview-position right|bottom] [QUERY]"
+    "usage: %s [--bench] [--limit N] [--preview] [--preview-position right|bottom] [--multi] [QUERY]"
     program
 
 let parse_limit raw =
@@ -56,6 +67,7 @@ let parse_raw args =
   let rec loop raw = function
     | [] -> Ok raw
     | "--bench" :: rest -> loop { raw with raw_bench = true } rest
+    | "--multi" :: rest -> loop { raw with raw_multi = true } rest
     | "--limit" :: raw_limit :: rest -> (
         match parse_limit raw_limit with
         | Ok limit -> loop { raw with raw_limit = Some limit } rest
@@ -75,22 +87,38 @@ let parse_raw args =
   loop empty_raw args
 
 let validate (raw : raw_config) =
-  match (raw.raw_preview_position, raw.raw_preview, raw.raw_bench, raw.raw_limit, raw.raw_query) with
-  | Some _, false, _, _, _ -> Error Preview_position_without_preview
-  | _, true, true, _, _ -> Error Preview_conflicts_with_bench
-  | _, true, _, Some _, _ -> Error Preview_conflicts_with_limit
-  | _, _, true, _, None -> Error Missing_query
-  | _, false, false, Some _, None -> Error Missing_query
+  match
+    ( raw.raw_preview_position,
+      raw.raw_preview,
+      raw.raw_multi,
+      raw.raw_bench,
+      raw.raw_limit,
+      raw.raw_query )
+  with
+  | Some _, false, _, _, _, _ -> Error Preview_position_without_preview
+  | _, true, _, true, _, _ -> Error Preview_conflicts_with_bench
+  | _, true, _, _, Some _, _ -> Error Preview_conflicts_with_limit
+  | _, _, true, true, _, _ -> Error Multi_conflicts_with_bench
+  | _, _, true, _, Some _, _ -> Error Multi_conflicts_with_limit
+  | _, _, _, true, _, None -> Error Missing_query
+  | _, false, false, false, Some _, None -> Error Missing_query
   | _ ->
       let preview_position = Option.value raw.raw_preview_position ~default:Preview_right in
       let query = Option.value raw.raw_query ~default:"" in
       let mode =
         if raw.raw_bench then Bench
-        else if raw.raw_preview || raw.raw_query = None then Interactive
+        else if raw.raw_preview || raw.raw_multi || raw.raw_query = None then Interactive
         else Search
       in
       let config : config =
-        { query; limit = raw.raw_limit; mode; preview = raw.raw_preview; preview_position }
+        {
+          query;
+          limit = raw.raw_limit;
+          mode;
+          preview = raw.raw_preview;
+          preview_position;
+          multi = raw.raw_multi;
+        }
       in
       Ok config
 
@@ -124,4 +152,10 @@ let error_message program = function
         (usage program)
   | Preview_conflicts_with_limit ->
       Printf.sprintf "invalid options: --preview cannot be combined with --limit\n%s"
+        (usage program)
+  | Multi_conflicts_with_bench ->
+      Printf.sprintf "invalid options: --multi cannot be combined with --bench\n%s"
+        (usage program)
+  | Multi_conflicts_with_limit ->
+      Printf.sprintf "invalid options: --multi cannot be combined with --limit\n%s"
         (usage program)

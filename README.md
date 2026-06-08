@@ -13,7 +13,7 @@ original non-interactive fuzzy-filter behavior.
 
 ## Current status
 
-Implemented through v0.17 Cursor-Aware Query Editing plus three
+Implemented through v0.18 Multi-Select plus three
 technical-debt stabilization passes:
 
 - Case-insensitive subsequence fuzzy matching.
@@ -45,6 +45,8 @@ technical-debt stabilization passes:
   handling.
 - Cursor-aware interactive query editing with Left/Right, Home/End, Ctrl-A,
   Ctrl-E, Backspace, Delete/Ctrl-D, Ctrl-U, and Ctrl-W.
+- Optional `--multi` interactive mode where Space toggles marked candidates and
+  Enter prints all marked candidates, one per line.
 - Selection clamping and viewport recalculation after result shrink or terminal
   resize checks.
 - Width-aware text helpers for safer interactive rendering of ASCII, tabs,
@@ -98,8 +100,15 @@ Interactive mode starts when no query is provided:
 printf 'hello\nhelp\nworld\n' | dune exec ofzf --
 ```
 
-The UI renders to the controlling terminal and prints only the selected line to
-standard output.
+Multi-select also starts interactive mode:
+
+```sh
+printf 'hello\nhelp\nworld\n' | dune exec ofzf -- --multi he
+```
+
+The UI renders to the controlling terminal and prints only final selected output to
+standard output. In `--multi` mode, Space toggles candidates and Enter prints
+marked candidates one per line.
 
 ## Development
 
@@ -133,6 +142,14 @@ dune exec ofzf -- < candidates.txt
 ```sh
 dune exec ofzf -- --preview --preview-position right < candidates.txt
 ```
+
+```sh
+dune exec ofzf -- --multi < candidates.txt
+```
+
+In multi-select mode, Space toggles the highlighted candidate. Enter prints all
+marked candidates to stdout in original input order; if nothing is marked, Enter
+prints the highlighted candidate like normal single-select mode.
 
 With preview enabled, if a selected candidate is a readable regular file path,
 the preview pane shows file contents. It never executes the selected candidate

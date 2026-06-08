@@ -8,12 +8,13 @@ cat input.txt | ofzf
 ```
 
 It remains an MVP: preview is synchronous and intentionally limited, with no
-multi-select, no mouse support, no ncurses, and no shell integration.
+mouse support, no ncurses, and no shell integration.
 
 ## Mode selection
 
-The CLI selects interactive mode only when no query is provided. Existing modes
-remain backward compatible:
+The CLI selects interactive mode when no query is provided, when `--preview` is
+used, or when `--multi` is used. Existing non-interactive modes remain backward
+compatible:
 
 ```sh
 cat input.txt | ofzf QUERY
@@ -22,16 +23,34 @@ cat input.txt | ofzf --bench QUERY
 ```
 
 This means scripts that already pass a query keep receiving ranked matching
-lines with no UI.
+lines with no UI unless they explicitly request `--multi` or `--preview`.
 
 ## Input and output streams
 
 Interactive mode reads all stdin candidates once before entering the UI. It then
 opens `/dev/tty` for raw key input and ANSI rendering. When the user presses
-Enter on a selected result, only that selected candidate is printed to stdout.
+Enter on a selected result, only final candidate output is printed to stdout.
 
 This mirrors the important shell-pipeline property of fuzzy finders: UI noise
 does not contaminate stdout.
+
+## Multi-select
+
+`--multi` enables interactive multi-select:
+
+```sh
+cat input.txt | ofzf --multi
+cat input.txt | ofzf --multi matcher
+cat input.txt | ofzf --multi --preview matcher
+```
+
+Space toggles the highlighted result. Marked candidates stay marked across query
+changes even when the current query hides them, because the marked set is kept
+against the full stdin candidate list rather than the visible result page.
+
+Enter prints marked candidates in original input order, one per line. If no
+candidates are marked, Enter prints the highlighted candidate exactly like normal
+single-select mode. Escape and Ctrl-C keep the existing cancellation behavior.
 
 ## Query editing
 
@@ -137,7 +156,8 @@ unexpected exceptions.
 ## Exit behavior
 
 - Enter prints the selected candidate to stdout and exits 0 when a result is
-  selected.
+  selected. In `--multi` mode, Enter prints all marked candidates in input order;
+  with no marks it falls back to the highlighted candidate.
 - Enter with no result exits non-zero and prints no selected candidate.
 - Escape restores the terminal and exits non-zero.
 - Ctrl-C restores the terminal and exits non-zero.
@@ -158,7 +178,6 @@ candidate IDs, and background indexing.
 ## Current limitations
 
 - Preview is synchronous and file/text-only; command-based preview is deferred.
-- No multi-select.
 - No mouse support.
 - Resize handling is signal-aware but still full-frame rather than partial.
 - Query editing avoids splitting UTF-8 byte sequences where practical, but it is

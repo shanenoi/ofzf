@@ -19,7 +19,7 @@ stdin candidates + no argv query
   -> Search_engine.incremental_search on query edits
   -> ANSI-rendered highlighted result window on /dev/tty
   -> optional Preview content loading for selected candidates
-  -> selected candidate on stdout
+  -> selected candidate(s) on stdout
 
 bench mode:
 stdin candidates + query
@@ -95,7 +95,8 @@ changes, and asks `Render` to position the terminal cursor in the prompt.
 ### Selection and viewport
 
 `lib/selection.ml` owns selected-index movement, clamping, selected-candidate
-lookup, and selection preservation after result changes. `lib/viewport.ml` owns
+lookup, selection preservation after result changes, and pure multi-select set
+helpers that keep marked candidates in original input order. `lib/viewport.ml` owns
 prompt/status header sizing, visible-window calculation, and preview-layout-aware
 result-pane row counts.
 
@@ -122,8 +123,9 @@ their owning modules.
 keeps command-line behavior testable without spawning a process.
 
 Argument validation is order-independent. Preview is interactive-only, so
-`--preview-position` without `--preview`, `--preview --limit`, and
-`--preview --bench` are rejected with clear errors. `--bench --limit N QUERY`
+`--preview-position` without `--preview`, `--preview --limit`,
+`--preview --bench`, `--multi --bench`, and `--multi --limit` are rejected with
+clear errors. `--bench --limit N QUERY`
 remains valid.
 
 ### Benchmark executable
@@ -277,7 +279,7 @@ The architecture leaves room for fzf-style speed improvements:
 5. Parallelize scoring across chunks for non-streaming batch use cases.
 6. Improve terminal redraw minimality.
 7. Cache pre-rendered candidate fragments for large interactive result sets.
-8. Add command-based preview and multi-select only after the safe preview core is stable.
+8. Add command-based preview only after the safe preview core is stable.
 
 ### Preview foundation
 

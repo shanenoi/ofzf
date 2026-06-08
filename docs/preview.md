@@ -111,7 +111,8 @@ controlled command model in a later milestone.
 - No async preview execution.
 - No background workers.
 - No shell integration or placeholder expansion.
-- No multi-select interaction with preview yet.
+- Preview can be combined with multi-select. The preview pane follows the
+  highlighted row; marked candidates are still printed on Enter in input order.
 
 Top-K selection is heap-backed, stable, and bounded to `O(K)` retained results.
 Preview rendering consumes already-ranked results and does not depend on the

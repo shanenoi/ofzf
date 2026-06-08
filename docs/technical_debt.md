@@ -7,7 +7,8 @@ into the default Dune test workflow. v0.15 keeps ranking behavior stable while
 reducing repeated query/candidate normalization on the search hot path. v0.16
 replaces the streaming Top-K bounded-list path with a heap-backed accumulator for
 large-limit performance. v0.17 wires the existing cursor-aware query-editing
-model into the interactive loop and renderer.
+model into the interactive loop and renderer. v0.18 adds interactive multi-select
+without moving selection mutation into rendering or search.
 
 Completed in this pass:
 
@@ -32,6 +33,8 @@ Completed in this pass:
   ordering and stable tie behavior;
 - interactive query editing supports cursor movement, in-query insertion,
   Backspace/Delete, Home/End, Ctrl-A/Ctrl-E, Ctrl-U, and Ctrl-W;
+- multi-select state lives in `Interactive`, pure marked-candidate helpers live
+  in `Selection`, and `Render` only receives marker/count state to display;
 - small preview fixtures cover Unicode names, long names, CRLF, binary-looking
   content, directories, and missing paths;
 - `OFZF_DEBUG=1` writes concise diagnostics to stderr without changing stdout.
@@ -45,4 +48,5 @@ Recommended next cleanup order:
 
 1. add command-preview design docs before implementing any shell-facing feature;
 2. revisit query editing with full grapheme-cluster behavior;
-3. consider top-k threshold bailouts after collecting real-world benchmark data.
+3. consider candidate IDs for duplicate-safe multi-select and lower cache memory;
+4. consider top-k threshold bailouts after collecting real-world benchmark data.

@@ -12,7 +12,7 @@ reading and writing. This keeps the streams separated:
 
 - stdin remains the candidate input stream;
 - `/dev/tty` receives UI rendering and key input;
-- stdout remains reserved for the final selected candidate.
+- stdout remains reserved for final selected candidate output.
 
 When raw mode starts, the previous terminal mode is saved. The raw mode disables
 canonical input, echo, and terminal-generated signals so the program can receive
@@ -150,6 +150,9 @@ mode:
 - Ctrl-Y / Ctrl-E for preview line up/down;
 - Ctrl-B / Ctrl-F for preview page up/down;
 - Page Up / Page Down for result-list page navigation.
+- Space remains a printable query character in single-select mode. In
+  `--multi` mode, `Interactive` treats the decoded space character as a toggle
+  for the highlighted candidate before it reaches `Query_edit`.
 
 Unsupported escape sequences still become `Unknown` and are ignored by the
 query editor so control bytes do not corrupt the query.

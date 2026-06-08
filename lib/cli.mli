@@ -6,7 +6,8 @@ type preview_position = Preview_right | Preview_bottom
 type mode = Search | Bench | Interactive
 (** CLI mode. [Search] preserves normal filter behavior. [Bench] prints
     search-engine timing and cache statistics instead of matching lines.
-    [Interactive] starts the terminal UI when no query is provided. *)
+    [Interactive] starts the terminal UI when no query is provided or an
+    interactive-only option such as [--preview] or [--multi] is used. *)
 
 type config = {
   query : string;
@@ -14,6 +15,7 @@ type config = {
   mode : mode;
   preview : bool;
   preview_position : preview_position;
+  multi : bool;
 }
 (** Parsed CLI configuration. [limit = None] means full ranking. *)
 
@@ -26,6 +28,8 @@ type error =
   | Preview_position_without_preview
   | Preview_conflicts_with_bench
   | Preview_conflicts_with_limit
+  | Multi_conflicts_with_bench
+  | Multi_conflicts_with_limit
 (** User-facing parse errors. *)
 
 val parse : string array -> (config, error) result
@@ -38,9 +42,11 @@ val parse : string array -> (config, error) result
     - [ofzf --bench --limit N QUERY]
     - [ofzf --preview [QUERY]]
     - [ofzf --preview --preview-position right|bottom [QUERY]]
+    - [ofzf --multi [QUERY]]
 
     Preview mode is intentionally rejected when combined with [--bench] or
-    [--limit]. [--preview-position] is valid only with [--preview]. *)
+    [--limit]. [--preview-position] is valid only with [--preview]. Multi mode
+    starts the interactive UI and is rejected with [--bench] or [--limit]. *)
 
 val usage : string -> string
 (** Usage text for the executable name. *)

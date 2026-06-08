@@ -10,6 +10,8 @@ type state = {
   context : Search_engine.search_context;
   results : Matcher.match_result list;
   selected : int;
+  marked_candidates : string list;
+  multi : bool;
   preview : bool;
   preview_position : Preview.position;
   preview_state : preview_state;
@@ -30,6 +32,8 @@ let render_result_line = Render.render_result_line
 let render_preview_pane = Render.render_preview_pane
 let render_lines = Render.render_lines
 let selected_result = Selection.selected_result
+let toggle_candidate_selection = Selection.toggle_candidate
+let selected_candidate_outputs = Selection.selected_candidate_outputs
 let default_preview_state = Preview_state.default
 let update_preview_state = Preview_state.update
 let clamp_preview_state_scroll = Preview_state.clamp_scroll
@@ -90,9 +94,10 @@ let recompute candidates state edit =
     results = search.results;
     selected;
   }
-  |> sync_preview_state
+      |> sync_preview_state
 
-let initial_state ?(preview = false) ?(preview_position = Preview.Right) ?(initial_query = "") candidates =
+let initial_state ?(preview = false) ?(multi = false) ?(preview_position = Preview.Right) ?(initial_query = "")
+    candidates =
   let search =
     Search_engine.incremental_search ~context:Search_engine.empty_context
       ~query:initial_query candidates
@@ -103,6 +108,8 @@ let initial_state ?(preview = false) ?(preview_position = Preview.Right) ?(initi
     context = search.context;
     results = search.results;
     selected = 0;
+    marked_candidates = [];
+    multi;
     preview;
     preview_position;
     preview_state = default_preview_state;
@@ -121,6 +128,8 @@ let render handle terminal_size state =
   Terminal.move_cursor handle ~row:1 ~col:1;
   render_lines ~terminal_height:terminal_size.rows ~terminal_width:terminal_size.cols
     ~cursor_byte:state.cursor
+    ?marked_candidates:(if state.multi then Some state.marked_candidates else None)
+    ?multi_selected_count:(if state.multi then Some (List.length state.marked_candidates) else None)
     ~preview:state.preview ~preview_position:state.preview_position
     ~preview_content:state.preview_state.content ~preview_scroll:state.preview_state.scroll
     ~query:state.query ~selected:state.selected state.results
@@ -156,6 +165,15 @@ let apply_preview_scroll_key ~visible_rows key state =
 let update_selection selected state =
   { state with selected } |> sync_preview_state
 
+let toggle_current_candidate candidates state =
+  match selected_candidate_text ~selected:state.selected state.results with
+  | None -> state
+  | Some candidate ->
+      {
+        state with
+        marked_candidates = toggle_candidate_selection ~candidates ~candidate ~marked:state.marked_candidates;
+      }
+
 let apply_query_key_to_state key state =
   let before = Query_edit.make ~cursor:state.cursor state.query in
   let after = apply_key_to_query_edit key before in
@@ -172,7 +190,11 @@ let is_selection_key = function
   | Terminal.Arrow_up | Terminal.Arrow_down | Terminal.Page_up | Terminal.Page_down -> true
   | _ -> false
 
-let run_loop handle ~preview:handle_preview ~preview_position:handle_preview_position
+let is_multi_toggle_key = function
+  | Terminal.Character ' ' -> true
+  | _ -> false
+
+let run_loop handle ~preview:handle_preview ~multi:handle_multi ~preview_position:handle_preview_position
     ~initial_query:handle_initial_query candidates =
   let rec loop state =
     let size = Terminal.terminal_size ~handle () in
@@ -187,8 +209,19 @@ let run_loop handle ~preview:handle_preview ~preview_position:handle_preview_pos
     match Terminal.read_key handle with
     | Terminal.Ctrl_c -> (None, 130)
     | Terminal.Escape -> (None, 1)
-    | Terminal.Enter -> selected_result ~selected:state.selected state.results
+    | Terminal.Enter ->
+        let output, code =
+          if state.multi then
+            selected_candidate_outputs ~candidates ~marked:state.marked_candidates
+              ~selected:state.selected state.results
+          else
+            match selected_result ~selected:state.selected state.results with
+            | Some result, code -> ([ result.Matcher.candidate ], code)
+            | None, code -> ([], code)
+        in
+        (Some output, code)
     | Terminal.Resize -> loop (clamp_state_preview_scroll ~visible_rows:visible_preview_rows state)
+    | key when state.multi && is_multi_toggle_key key -> loop (toggle_current_candidate candidates state)
     | key when state.preview -> (
         match apply_preview_scroll_key ~visible_rows:visible_preview_rows key state with
         | Some state -> loop state
@@ -224,10 +257,10 @@ let run_loop handle ~preview:handle_preview ~preview_position:handle_preview_pos
         | `Query_changed edit -> loop (recompute candidates state edit))
   in
   loop
-    (initial_state ~preview:handle_preview ~preview_position:handle_preview_position
+    (initial_state ~preview:handle_preview ~multi:handle_multi ~preview_position:handle_preview_position
        ~initial_query:handle_initial_query candidates)
 
-let run ~preview ~preview_position ~initial_query ~candidates =
+let run ~preview ~multi ~preview_position ~initial_query ~candidates =
   if candidates = [] then (
     Debug.log "interactive start failed: empty stdin";
     prerr_endline "ofzf: no candidates on stdin for interactive mode";
@@ -242,10 +275,10 @@ let run ~preview ~preview_position ~initial_query ~candidates =
         try
           Terminal.enter_alternate_screen handle;
           Terminal.hide_cursor handle;
-          let selected, code = run_loop handle ~preview ~preview_position ~initial_query candidates in
+          let selected, code = run_loop handle ~preview ~multi ~preview_position ~initial_query candidates in
           cleanup handle;
           (match selected with
-          | Some result -> print_endline result.Matcher.candidate
+          | Some candidates -> List.iter print_endline candidates
           | None -> ());
           code
         with exn ->

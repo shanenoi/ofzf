@@ -30,6 +30,19 @@ let () =
   assert_true "selected contains inverse" (contains ~needle:Ofzf.Terminal.inverse selected);
   assert_true "ansi ignored for width"
     (Ofzf.Text_width.display_width_ansi selected <= 7);
+  let marked =
+    Ofzf.Render.render_result_line ~terminal_width:12 ~multi:true ~marked:true ~selected:false
+      (result "matcher" [ 0 ])
+  in
+  assert_true "multi marked row contains marker" (contains ~needle:"[x]" marked);
+  let highlighted_marked =
+    Ofzf.Render.render_result_line ~terminal_width:12 ~multi:true ~marked:true ~selected:true
+      (result "matcher" [ 0 ])
+  in
+  assert_true "highlighted multi row remains distinct" (contains ~needle:Ofzf.Terminal.inverse highlighted_marked);
+  assert_true "highlighted multi row includes selected marker" (contains ~needle:"[x]" highlighted_marked);
+  assert_true "multi row width bounded"
+    (Ofzf.Text_width.display_width_ansi highlighted_marked <= 12);
   let unicode = Ofzf.Render.render_result_line ~terminal_width:3 ~selected:false (result "界abc" [ 0 ]) in
   assert_true "unicode clipped safely" (Ofzf.Text_width.display_width_ansi unicode <= 3);
   let empty_prompt = Ofzf.Render.render_prompt ~cursor_byte:0 ~terminal_width:8 ~query:"" in
@@ -56,6 +69,14 @@ let () =
   assert_true "bottom preview composition contains preview" (List.exists (contains ~needle:"preview line") bottom);
   let empty = Ofzf.Render.render_lines ~terminal_height:4 ~terminal_width:80 ~query:"zz" ~selected:0 [] in
   assert_true "empty result message" (List.exists (contains ~needle:"no matches") empty);
+  let multi_status =
+    Ofzf.Render.render_lines ~terminal_height:4 ~terminal_width:80 ~query:"m" ~selected:1
+      ~marked_candidates:[ "scoring.ml" ] ~multi_selected_count:1
+      [ result "matcher.ml" [ 0 ]; result "scoring.ml" [ 0 ] ]
+  in
+  assert_true "multi status shows selected count" (List.exists (contains ~needle:"1 selected") multi_status);
+  assert_true "multi render marks selected row" (List.exists (contains ~needle:"[x]") multi_status);
+  assert_true "multi render marks unselected rows too" (List.exists (contains ~needle:"[ ]") multi_status);
   let zero =
     Ofzf.Render.render_lines ~terminal_height:0 ~terminal_width:80 ~query:"m" ~selected:0
       [ result "matcher" [ 0 ] ]
@@ -86,4 +107,9 @@ let () =
       ~preview_position:Ofzf.Preview.Right ~preview_content:content ~query:"m" ~selected:0
       [ result "matcher" [ 0 ] ]
   in
-  assert_lines_fit ~message:"tiny preview render" ~terminal_height:2 ~terminal_width:1 tiny_preview
+  assert_lines_fit ~message:"tiny preview render" ~terminal_height:2 ~terminal_width:1 tiny_preview;
+  let tiny_multi =
+    Ofzf.Render.render_lines ~terminal_height:3 ~terminal_width:1 ~marked_candidates:[ "matcher" ]
+      ~multi_selected_count:1 ~query:"m" ~selected:0 [ result "matcher" [ 0 ] ]
+  in
+  assert_lines_fit ~message:"tiny multi render" ~terminal_height:3 ~terminal_width:1 tiny_multi

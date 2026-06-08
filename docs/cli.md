@@ -1,17 +1,19 @@
 # CLI
 
 `ofzf` supports the original non-interactive fuzzy-filter modes plus an
-interactive terminal mode when no query is provided.
+interactive terminal mode when no query is provided or when `--multi`/`--preview`
+request interactive behavior.
 
 ```sh
 cat input.txt | ofzf QUERY
 cat input.txt | ofzf --limit N QUERY
 cat input.txt | ofzf --bench QUERY
 cat input.txt | ofzf
+cat input.txt | ofzf --multi [QUERY]
 ```
 
-No ncurses, multi-select behavior, mouse support, background indexing, or shell
-integration is implemented in this milestone.
+No ncurses, mouse support, background indexing, or shell integration is
+implemented in this milestone.
 
 ## Argument handling
 
@@ -22,7 +24,9 @@ Supported forms:
   matching lines.
 - `ofzf --bench QUERY` prints benchmark and incremental-search statistics.
 - `ofzf` reads stdin candidates once, starts interactive mode on `/dev/tty`, and
-  prints only the selected candidate to stdout.
+  prints only the selected candidate output to stdout.
+- `ofzf --multi [QUERY]` starts interactive mode with optional initial query and
+  prints all marked candidates on Enter.
 
 Error behavior:
 
@@ -37,10 +41,13 @@ Error behavior:
 
 ## Interactive mode
 
-Interactive mode is selected only by the no-query form:
+Interactive mode is selected by the no-query form, preview mode, or multi-select
+mode:
 
 ```sh
 cat input.txt | ofzf
+cat input.txt | ofzf --multi
+cat input.txt | ofzf --multi matcher
 ```
 
 The candidate list is read from stdin before raw mode starts. The UI opens
@@ -58,7 +65,9 @@ Supported keys:
 - Ctrl-W deletes the previous whitespace-delimited query word;
 - Arrow Up/Down moves the selected row;
 - Page Up/Page Down moves the selected row by a visible page where supported;
-- Enter prints the selected candidate to stdout and exits successfully;
+- in `--multi` mode, Space toggles the highlighted candidate instead of editing
+  the query;
+- Enter prints selected candidate output to stdout and exits successfully;
 - Escape exits non-zero;
 - Ctrl-C exits non-zero.
 
@@ -66,7 +75,13 @@ The result window is based on terminal height and width where practical. If size
 cannot be detected, `ofzf` falls back to a safe default. The UI uses the
 alternate screen, clips long rows, highlights matched characters, shows the
 match count and selected index, and leaves stdout reserved for the selected
-candidate only.
+candidate output only.
+
+In multi-select mode, marked candidates stay marked while the query changes, as
+long as the candidate text still exists in the full stdin candidate set. Enter
+prints marked candidates in original input order, one per line. If no candidates
+are marked, Enter falls back to the highlighted candidate so single-result flows
+still feel natural.
 
 If Enter is pressed while there are no results, interactive mode exits non-zero
 without printing a selected line. Escape and Ctrl-C also cancel with non-zero
@@ -169,6 +184,9 @@ also present. `--preview` is intentionally rejected with `--bench` and with
 External preview commands, shell expansion, and `{}` placeholder expansion are
 intentionally out of scope.
 
+Preview can be combined with `--multi`, so users can mark multiple candidates
+while still previewing the highlighted row.
+
 The validation pass is order-independent: `--bench --preview QUERY` and
 `--preview --bench QUERY` fail with the same conflict, and valid preview-position
 forms work regardless of option order.
@@ -190,13 +208,16 @@ does not change behavior.
 - `--preview --bench QUERY` and `--bench --preview QUERY` are both rejected.
 - `--preview --limit N QUERY` is rejected because preview is interactive and
   `--limit` belongs to non-interactive/benchmark top-k paths.
+- `--multi [QUERY]` is interactive and is valid with `--preview`.
+- `--multi --bench QUERY` and `--multi --limit N QUERY` are rejected because
+  multi-select is an interactive UI feature.
 - invalid `--preview-position` values are rejected before interactive mode starts.
 
 ## Debug mode
 
 `OFZF_DEBUG=1` enables concise diagnostic logs on stderr. Debug mode does not
 change stdout, which remains reserved for ranked candidates in non-interactive
-mode or the selected candidate in interactive mode. Debug logs avoid file
+mode or selected candidate output in interactive mode. Debug logs avoid file
 contents and large candidate lists.
 
 ## Process-level smoke tests
@@ -206,6 +227,7 @@ default. The Dune test stanza builds `bin/main.exe`, sets `OFZF_TEST_BIN` for th
 process test, and keeps parser-only tests separate from executable smoke tests.
 
 The process tests cover ranked search output, `--limit`, `--limit 0`, `--bench`,
-debug stderr behavior, invalid CLI combinations, and preview validation that can
-fail safely without a real interactive terminal. Search results remain on stdout;
-usage, validation, debug, and terminal-startup messages remain on stderr.
+debug stderr behavior, invalid CLI combinations, preview validation, and
+multi-select validation that can fail safely without a real interactive
+terminal. Search results remain on stdout; usage, validation, debug, and
+terminal-startup messages remain on stderr.
