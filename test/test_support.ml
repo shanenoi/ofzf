@@ -121,13 +121,48 @@ type process_result = {
   stderr : string;
 }
 
-let run_shell command =
+let command_string program args =
+  String.concat " " (List.map shell_quote (program :: args))
+
+let merge_environment overrides =
+  let override_names = List.map fst overrides in
+  let is_overridden entry =
+    match String.index_opt entry '=' with
+    | None -> false
+    | Some index ->
+        let name = String.sub entry 0 index in
+        List.exists (( = ) name) override_names
+  in
+  Array.to_list (Unix.environment ())
+  |> List.filter (fun entry -> not (is_overridden entry))
+  |> fun base ->
+  base @ List.map (fun (name, value) -> name ^ "=" ^ value) overrides
+  |> Array.of_list
+
+let run_process ?(stdin = "") ?(env = []) program args =
   with_temp_dir (fun dir ->
+      let stdin_path = Filename.concat dir "stdin" in
       let stdout_path = Filename.concat dir "stdout" in
       let stderr_path = Filename.concat dir "stderr" in
-      let status = Sys.command (command ^ " > " ^ shell_quote stdout_path ^ " 2> " ^ shell_quote stderr_path) in
-      let status = if status = 0 then Unix.WEXITED 0 else Unix.WEXITED status in
-      { command; status; stdout = read_file stdout_path; stderr = read_file stderr_path })
+      write_file stdin_path stdin;
+      let stdin_fd = Unix.openfile stdin_path [ Unix.O_RDONLY ] 0 in
+      let stdout_fd = Unix.openfile stdout_path [ Unix.O_WRONLY; Unix.O_CREAT; Unix.O_TRUNC ] 0o600 in
+      let stderr_fd = Unix.openfile stderr_path [ Unix.O_WRONLY; Unix.O_CREAT; Unix.O_TRUNC ] 0o600 in
+      Fun.protect
+        ~finally:(fun () ->
+          List.iter
+            (fun fd -> try Unix.close fd with Unix.Unix_error _ -> ())
+            [ stdin_fd; stdout_fd; stderr_fd ])
+        (fun () ->
+          let argv = Array.of_list (program :: args) in
+          let pid = Unix.create_process_env program argv (merge_environment env) stdin_fd stdout_fd stderr_fd in
+          let _, status = Unix.waitpid [] pid in
+          {
+            command = command_string program args;
+            status;
+            stdout = read_file stdout_path;
+            stderr = read_file stderr_path;
+          }))
 
 let exit_code = function
   | Unix.WEXITED code -> code

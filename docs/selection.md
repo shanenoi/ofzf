@@ -11,10 +11,11 @@ preview file loading.
 - Enter-key selection result helpers;
 - selected-candidate lookup;
 - preserving the selected candidate after query/result changes when it still
-  exists in the new result set.
-- pure multi-select helpers for toggling candidate text, keeping marked
-  candidates in original input order, and falling back to the highlighted row
-  when no candidates are marked.
+  exists in the new result set;
+- pure multi-select helpers for toggling candidate IDs, keeping marked
+  candidates in original input order, preserving duplicate candidate text as
+  separate selectable input rows, and falling back to the highlighted row when
+  no candidates are marked.
 
 `Viewport` owns:
 

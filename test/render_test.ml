@@ -13,7 +13,8 @@ let contains ~needle value =
   in
   loop 0
 
-let result candidate positions = Ofzf.Matcher.{ candidate; positions; score = 0 }
+let result ?(original_index = 0) candidate positions =
+  Ofzf.Matcher.{ candidate; original_index; positions; score = 0 }
 
 let assert_lines_fit ~message ~terminal_height ~terminal_width lines =
   assert_true (message ^ " height") (List.length lines <= max 0 terminal_height);
@@ -71,8 +72,8 @@ let () =
   assert_true "empty result message" (List.exists (contains ~needle:"no matches") empty);
   let multi_status =
     Ofzf.Render.render_lines ~terminal_height:4 ~terminal_width:80 ~query:"m" ~selected:1
-      ~marked_candidates:[ "scoring.ml" ] ~multi_selected_count:1
-      [ result "matcher.ml" [ 0 ]; result "scoring.ml" [ 0 ] ]
+      ~marked_candidate_ids:[ 1 ]
+      [ result ~original_index:0 "matcher.ml" [ 0 ]; result ~original_index:1 "scoring.ml" [ 0 ] ]
   in
   assert_true "multi status shows selected count" (List.exists (contains ~needle:"1 selected") multi_status);
   assert_true "multi render marks selected row" (List.exists (contains ~needle:"[x]") multi_status);
@@ -109,7 +110,7 @@ let () =
   in
   assert_lines_fit ~message:"tiny preview render" ~terminal_height:2 ~terminal_width:1 tiny_preview;
   let tiny_multi =
-    Ofzf.Render.render_lines ~terminal_height:3 ~terminal_width:1 ~marked_candidates:[ "matcher" ]
-      ~multi_selected_count:1 ~query:"m" ~selected:0 [ result "matcher" [ 0 ] ]
+    Ofzf.Render.render_lines ~terminal_height:3 ~terminal_width:1 ~marked_candidate_ids:[ 0 ]
+      ~query:"m" ~selected:0 [ result "matcher" [ 0 ] ]
   in
   assert_lines_fit ~message:"tiny multi render" ~terminal_height:3 ~terminal_width:1 tiny_multi

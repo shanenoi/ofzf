@@ -34,7 +34,13 @@ Completed in this pass:
 - interactive query editing supports cursor movement, in-query insertion,
   Backspace/Delete, Home/End, Ctrl-A/Ctrl-E, Ctrl-U, and Ctrl-W;
 - multi-select state lives in `Interactive`, pure marked-candidate helpers live
-  in `Selection`, and `Render` only receives marker/count state to display;
+  in `Selection`, and `Render` only receives candidate IDs to display markers;
+- multi-select marks are keyed by original input index, so duplicate candidate
+  text can be selected and emitted independently;
+- incremental search preserves original input indexes when reusing cached or
+  previous-prefix subsets, keeping tie stability consistent with full search;
+- process-level CLI tests spawn the executable directly with pipes instead of
+  shelling through `printf`, reducing quoting and platform brittleness;
 - small preview fixtures cover Unicode names, long names, CRLF, binary-looking
   content, directories, and missing paths;
 - `OFZF_DEBUG=1` writes concise diagnostics to stderr without changing stdout.
@@ -48,5 +54,6 @@ Recommended next cleanup order:
 
 1. add command-preview design docs before implementing any shell-facing feature;
 2. revisit query editing with full grapheme-cluster behavior;
-3. consider candidate IDs for duplicate-safe multi-select and lower cache memory;
+3. consider extracting an `Interactive_update` module if the event loop grows
+   during command-preview or richer keybinding work;
 4. consider top-k threshold bailouts after collecting real-world benchmark data.

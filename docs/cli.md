@@ -77,11 +77,11 @@ alternate screen, clips long rows, highlights matched characters, shows the
 match count and selected index, and leaves stdout reserved for the selected
 candidate output only.
 
-In multi-select mode, marked candidates stay marked while the query changes, as
-long as the candidate text still exists in the full stdin candidate set. Enter
-prints marked candidates in original input order, one per line. If no candidates
-are marked, Enter falls back to the highlighted candidate so single-result flows
-still feel natural.
+In multi-select mode, marked candidates stay marked while the query changes.
+Marks are keyed by original stdin row index, so duplicate candidate text can be
+selected independently. Enter prints marked candidates in original input order,
+one per line. If no candidates are marked, Enter falls back to the highlighted
+candidate so single-result flows still feel natural.
 
 If Enter is pressed while there are no results, interactive mode exits non-zero
 without printing a selected line. Escape and Ctrl-C also cancel with non-zero

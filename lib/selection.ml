@@ -24,39 +24,43 @@ let selected_candidate_text ~selected results =
   | None -> None
   | Some result -> Some result.Matcher.candidate
 
-let preserve_selected_candidate ~previous_candidate ~fallback_selected results =
-  match previous_candidate with
+let selected_candidate_id ~selected results =
+  match fst (selected_result ~selected results) with
+  | None -> None
+  | Some result -> Some result.Matcher.original_index
+
+let preserve_selected_candidate_id ~previous_candidate_id ~fallback_selected results =
+  match previous_candidate_id with
   | None -> clamp ~selected:fallback_selected ~result_count:(List.length results)
-  | Some candidate ->
+  | Some candidate_id ->
       let rec loop index = function
         | [] -> clamp ~selected:fallback_selected ~result_count:(List.length results)
-        | result :: _ when result.Matcher.candidate = candidate -> index
+        | result :: _ when result.Matcher.original_index = candidate_id -> index
         | _ :: rest -> loop (index + 1) rest
       in
       loop 0 results
 
-let candidate_marked ~marked ~candidate = List.exists (( = ) candidate) marked
+let candidate_marked ~marked_candidate_ids ~candidate_id =
+  List.exists (( = ) candidate_id) marked_candidate_ids
 
-let marked_candidates_in_input_order ~candidates ~marked =
-  let rec loop emitted acc = function
-    | [] -> List.rev acc
-    | candidate :: rest ->
-        if candidate_marked ~marked ~candidate && not (candidate_marked ~marked:emitted ~candidate)
-        then loop (candidate :: emitted) (candidate :: acc) rest
-        else loop emitted acc rest
-  in
-  loop [] [] candidates
+let normalize_marked_candidate_ids marked_candidate_ids =
+  marked_candidate_ids |> List.sort_uniq compare
 
-let toggle_candidate ~candidates ~candidate ~marked =
-  let marked =
-    if candidate_marked ~marked ~candidate then
-      List.filter (fun marked_candidate -> marked_candidate <> candidate) marked
-    else candidate :: marked
-  in
-  marked_candidates_in_input_order ~candidates ~marked
+let toggle_candidate_id ~candidate_id ~marked_candidate_ids =
+  if candidate_marked ~marked_candidate_ids ~candidate_id then
+    List.filter (fun marked_candidate_id -> marked_candidate_id <> candidate_id) marked_candidate_ids
+  else normalize_marked_candidate_ids (candidate_id :: marked_candidate_ids)
 
-let selected_candidate_outputs ~candidates ~marked ~selected results =
-  match marked_candidates_in_input_order ~candidates ~marked with
+let marked_candidates_in_input_order ~candidates ~marked_candidate_ids =
+  let marked_candidate_ids = normalize_marked_candidate_ids marked_candidate_ids in
+  candidates
+  |> List.mapi (fun original_index candidate ->
+         if candidate_marked ~marked_candidate_ids ~candidate_id:original_index then Some candidate
+         else None)
+  |> List.filter_map Fun.id
+
+let selected_candidate_outputs ~candidates ~marked_candidate_ids ~selected results =
+  match marked_candidates_in_input_order ~candidates ~marked_candidate_ids with
   | _ :: _ as selected_candidates -> (selected_candidates, 0)
   | [] -> (
       match selected_candidate_text ~selected results with

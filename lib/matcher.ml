@@ -1,5 +1,6 @@
 type match_result = {
   candidate : string;
+  original_index : int;
   positions : int list;
   score : int;
 }
@@ -53,21 +54,26 @@ let find_positions ~query ~candidate =
 let result_of_scored (scored : Scoring.scored_match) =
   {
     candidate = scored.Scoring.candidate;
+    original_index = scored.Scoring.original_index;
     positions = scored.Scoring.positions;
     score = scored.Scoring.score;
   }
 
-let match_prepared ~query ~candidate =
+let match_prepared_indexed ~original_index ~query ~candidate =
   match find_positions_prepared ~query ~candidate with
   | None -> None
   | Some positions ->
       Some
         {
           candidate;
+          original_index;
           positions;
           score =
             Scoring.score_prepared ~query:query.scoring_query ~candidate ~positions;
         }
+
+let match_prepared ~query ~candidate =
+  match_prepared_indexed ~original_index:0 ~query ~candidate
 
 let match_candidate ~query ~candidate =
   match_prepared ~query:(prepare_query query) ~candidate
@@ -113,7 +119,7 @@ let rank_top ~query ~k candidates =
              in
              Topk.push best
                {
-                 value = { candidate; positions; score = computed_score };
+                 value = { candidate; original_index; positions; score = computed_score };
                  score = computed_score;
                  original_index;
                });

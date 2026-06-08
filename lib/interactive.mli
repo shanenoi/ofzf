@@ -71,8 +71,7 @@ val render_lines :
   ?preview_position:Preview.position ->
   ?preview_content:Preview.content ->
   ?preview_scroll:int ->
-  ?marked_candidates:string list ->
-  ?multi_selected_count:int ->
+  ?marked_candidate_ids:int list ->
   terminal_height:int ->
   query:string ->
   selected:int ->
@@ -86,11 +85,11 @@ val selected_result : selected:int -> Matcher.match_result list -> (Matcher.matc
 (** Enter-key result helper. Returns [(Some result, 0)] when a result exists and
     [(None, 1)] when Enter is pressed with no selectable result. *)
 
-val toggle_candidate_selection : candidates:string list -> candidate:string -> marked:string list -> string list
-(** Toggle one candidate in the multi-select marked set. *)
+val toggle_candidate_selection : candidate_id:int -> marked_candidate_ids:int list -> int list
+(** Toggle one candidate ID in the multi-select marked set. *)
 
 val selected_candidate_outputs :
-  candidates:string list -> marked:string list -> selected:int -> Matcher.match_result list -> string list * int
+  candidates:string list -> marked_candidate_ids:int list -> selected:int -> Matcher.match_result list -> string list * int
 (** Multi-select Enter-key result helper. *)
 
 val preview_visible_rows :

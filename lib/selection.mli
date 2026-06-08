@@ -11,26 +11,31 @@ val selected_result :
 
 val selected_candidate_text : selected:int -> Matcher.match_result list -> string option
 
-val preserve_selected_candidate :
-  previous_candidate:string option -> fallback_selected:int -> Matcher.match_result list -> int
-(** Keep the previously selected candidate when it still exists; otherwise clamp
-    [fallback_selected] into the new result range. *)
+val selected_candidate_id : selected:int -> Matcher.match_result list -> int option
+(** Return the original input index of the highlighted result. *)
 
-val candidate_marked : marked:string list -> candidate:string -> bool
-(** Whether [candidate] is present in the multi-select marked set. *)
+val preserve_selected_candidate_id :
+  previous_candidate_id:int option -> fallback_selected:int -> Matcher.match_result list -> int
+(** Keep the previously highlighted input item when it still exists in the new
+    result set; otherwise clamp [fallback_selected] into the new result range. *)
 
-val marked_candidates_in_input_order : candidates:string list -> marked:string list -> string list
-(** Return marked candidates in original input order, dropping marks whose
-    candidate no longer exists in the full candidate list. Duplicate candidate
-    text is emitted once because the rest of the current selection model is
-    candidate-text based. *)
+val candidate_marked : marked_candidate_ids:int list -> candidate_id:int -> bool
+(** Whether [candidate_id] is present in the multi-select marked set. *)
 
-val toggle_candidate : candidates:string list -> candidate:string -> marked:string list -> string list
-(** Toggle [candidate] in the marked set and return marks in original input
-    order. *)
+val normalize_marked_candidate_ids : int list -> int list
+(** Sort and deduplicate marked candidate IDs into original input order. *)
+
+val toggle_candidate_id : candidate_id:int -> marked_candidate_ids:int list -> int list
+(** Toggle [candidate_id] in the marked set. Returned IDs are sorted by original
+    input order and deduplicated. *)
+
+val marked_candidates_in_input_order :
+  candidates:string list -> marked_candidate_ids:int list -> string list
+(** Return marked candidates in original input order. Duplicate candidate text is
+    preserved when the duplicate lines have distinct input indexes. *)
 
 val selected_candidate_outputs :
-  candidates:string list -> marked:string list -> selected:int -> Matcher.match_result list -> string list * int
+  candidates:string list -> marked_candidate_ids:int list -> selected:int -> Matcher.match_result list -> string list * int
 (** Multi-select Enter behavior. Marked candidates are returned in input order.
     When no candidates are marked, fall back to the currently highlighted
     result, matching single-select behavior. *)

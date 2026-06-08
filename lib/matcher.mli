@@ -3,9 +3,12 @@
 (** A successful match. *)
 type match_result = {
   candidate : string;
+  original_index : int;
   positions : int list;
   score : int;
 }
+  (** [original_index] is the zero-based input position used by ranked search
+      and interactive selection. Single-candidate helper calls use [0]. *)
 
 (** A query normalized once for repeated matching. *)
 type prepared_query
@@ -25,6 +28,11 @@ val match_candidate : query:string -> candidate:string -> match_result option
 (** [match_prepared ~query ~candidate] is equivalent to [match_candidate] but
     reuses a prepared query. *)
 val match_prepared : query:prepared_query -> candidate:string -> match_result option
+
+val match_prepared_indexed :
+  original_index:int -> query:prepared_query -> candidate:string -> match_result option
+(** [match_prepared_indexed] is equivalent to [match_prepared] but stores the
+    source input index on successful results. *)
 
 (** [matches ~query candidate] is [true] when [candidate] fuzzily matches
     [query]. *)

@@ -28,4 +28,18 @@ let () =
   assert_equal_int "fallback scans full input" (List.length candidates) fallback.stats.candidate_count_scanned;
   let repeated = Ofzf.Search_engine.incremental_search ~context:third.context ~query:"mat" candidates in
   assert_true "exact query cache hit" (repeated.stats.cache_hits >= 1);
-  assert_equal_int "cache hit scans no candidates" 0 repeated.stats.candidate_count_scanned
+  assert_equal_int "cache hit scans no candidates" 0 repeated.stats.candidate_count_scanned;
+  let duplicate_candidates = [ "same"; "zzsame"; "same" ] in
+  let duplicate_search = Ofzf.Search_engine.full_search ~query:"sa" duplicate_candidates in
+  assert_equal_int_list "full search keeps original indexes for duplicate text" [ 0; 2; 1 ]
+    (List.map (fun result -> result.Ofzf.Matcher.original_index) duplicate_search.results);
+  let duplicate_first =
+    Ofzf.Search_engine.incremental_search ~context:Ofzf.Search_engine.empty_context ~query:"s"
+      duplicate_candidates
+  in
+  let duplicate_second =
+    Ofzf.Search_engine.incremental_search ~context:duplicate_first.context ~query:"sa"
+      duplicate_candidates
+  in
+  assert_equal_int_list "incremental search preserves original indexes for tie stability" [ 0; 2; 1 ]
+    (List.map (fun result -> result.Ofzf.Matcher.original_index) duplicate_second.results)

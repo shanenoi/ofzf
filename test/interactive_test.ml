@@ -65,10 +65,9 @@ let () =
   let some_selected, some_code = Ofzf.Interactive.selected_result ~selected:0 [ result ] in
   assert_true "enter with result selects it" (some_selected = Some result);
   assert_equal_int "enter with result exits successfully" 0 some_code;
-  assert_equal_string_list "interactive toggles candidate selection" [ "help" ]
-    (Ofzf.Interactive.toggle_candidate_selection ~candidates:[ "hello"; "help" ]
-       ~candidate:"help" ~marked:[]);
+  assert_equal_int_list "interactive toggles candidate selection" [ 1 ]
+    (Ofzf.Interactive.toggle_candidate_selection ~candidate_id:1 ~marked_candidate_ids:[]);
   assert_equal_string_list "interactive multi enter falls back to highlighted" [ "matcher.ml" ]
     (fst
-       (Ofzf.Interactive.selected_candidate_outputs ~candidates:[ "matcher.ml" ] ~marked:[]
+       (Ofzf.Interactive.selected_candidate_outputs ~candidates:[ "matcher.ml" ] ~marked_candidate_ids:[]
           ~selected:0 [ result ]))

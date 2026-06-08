@@ -95,8 +95,9 @@ changes, and asks `Render` to position the terminal cursor in the prompt.
 ### Selection and viewport
 
 `lib/selection.ml` owns selected-index movement, clamping, selected-candidate
-lookup, selection preservation after result changes, and pure multi-select set
-helpers that keep marked candidates in original input order. `lib/viewport.ml` owns
+lookup, selection preservation after result changes, and pure multi-select ID
+helpers that keep marked candidates in original input order while preserving
+duplicate candidate rows. `lib/viewport.ml` owns
 prompt/status header sizing, visible-window calculation, and preview-layout-aware
 result-pane row counts.
 
@@ -273,8 +274,9 @@ terminal width where practical.
 The architecture leaves room for fzf-style speed improvements:
 
 1. Replace list positions with arrays or reusable buffers on hot paths.
-2. Add candidate IDs for lower incremental memory overhead.
-3. Cache normalized candidate metadata in future interactive sessions.
+2. Cache normalized candidate metadata in future interactive sessions.
+3. Store compact candidate references in the query cache to lower memory
+   overhead.
 4. Add early bailouts when a candidate cannot beat the top-k threshold.
 5. Parallelize scoring across chunks for non-streaming batch use cases.
 6. Improve terminal redraw minimality.

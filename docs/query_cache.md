@@ -35,14 +35,17 @@ For example, if both `m` and `ma` are cached, query `mat` uses the `ma` subset.
 Each cached entry stores:
 
 - the query string;
-- the matching candidate strings for that query.
+- the matching candidate strings for that query;
+- each matched candidate's original stdin row index.
 
 This uses more memory than a stateless search, but it lets each additional typed
 character narrow a previous result set instead of rescanning all input. The
-current implementation uses a safe default maximum entry count of 64. Adding a
-new query moves that query to the front and evicts the oldest entries once the
-bound is exceeded. A cache with `max_entries = 0` keeps no entries. Future
-versions can add candidate IDs to reduce retained string references further.
+current implementation uses a safe default maximum entry count of 64 and keeps
+original row indexes so incremental ranking and multi-select identity match full
+search behavior. Adding a new query moves that query to the front and evicts the
+oldest entries once the bound is exceeded. A cache with `max_entries = 0` keeps
+no entries. Future versions can add compact candidate metadata to reduce
+retained string references further.
 
 ## Complexity
 

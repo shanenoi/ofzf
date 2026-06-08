@@ -138,25 +138,25 @@ let nth_default default index values =
   in
   loop 0 values
 
-let render_result_lines ~result_width ~query ~selected ~start ~stop ~marked_candidates results =
+let render_result_lines ~result_width ~query ~selected ~start ~stop ~marked_candidate_ids results =
   let result_count = List.length results in
   if result_count = 0 then [ Text_width.clip ~width:result_width (empty_results_message ~query) ]
   else
     slice results start stop
     |> List.map (fun (index, result) ->
            render_result_line ~terminal_width:result_width
-             ~multi:(marked_candidates <> None)
+             ~multi:(marked_candidate_ids <> None)
              ~marked:(
-               match marked_candidates with
+               match marked_candidate_ids with
                | None -> false
-               | Some marked_candidates ->
-                   Selection.candidate_marked ~marked:marked_candidates
-                     ~candidate:result.Matcher.candidate)
+               | Some marked_candidate_ids ->
+                   Selection.candidate_marked ~marked_candidate_ids
+                     ~candidate_id:result.Matcher.original_index)
              ~selected:(index = selected) result)
 
 let render_lines ?terminal_width ?cursor_byte ?(preview = false)
     ?(preview_position = Preview.Right) ?(preview_content = Preview.no_selection_content)
-    ?(preview_scroll = 0) ?marked_candidates ?multi_selected_count ~terminal_height
+    ?(preview_scroll = 0) ?marked_candidate_ids ~terminal_height
     ~query ~selected results =
   if terminal_height <= 0 then []
   else
@@ -182,13 +182,13 @@ let render_lines ?terminal_width ?cursor_byte ?(preview = false)
       else
         slice results start stop
         |> List.map (fun (index, result) ->
-               render_result_line ?terminal_width ~multi:(marked_candidates <> None)
+               render_result_line ?terminal_width ~multi:(marked_candidate_ids <> None)
                  ~marked:(
-                   match marked_candidates with
+                   match marked_candidate_ids with
                    | None -> false
-                   | Some marked_candidates ->
-                       Selection.candidate_marked ~marked:marked_candidates
-                         ~candidate:result.Matcher.candidate)
+                   | Some marked_candidate_ids ->
+                       Selection.candidate_marked ~marked_candidate_ids
+                         ~candidate_id:result.Matcher.original_index)
                  ~selected:(index = selected) result)
     in
     let body =
@@ -203,7 +203,7 @@ let render_lines ?terminal_width ?cursor_byte ?(preview = false)
               in
               let result_lines =
                 render_result_lines ~result_width ~query ~selected ~start ~stop
-                  ~marked_candidates results
+                  ~marked_candidate_ids results
               in
               let rows = max (List.length result_lines) (List.length preview_lines) in
               let rec loop index acc =
@@ -220,7 +220,7 @@ let render_lines ?terminal_width ?cursor_byte ?(preview = false)
               let result_width = layout.results.Preview.cols in
               let result_lines =
                 render_result_lines ~result_width ~query ~selected ~start ~stop
-                  ~marked_candidates results
+                  ~marked_candidate_ids results
               in
               let preview_lines =
                 render_preview_box ~width:preview_rect.Preview.cols
@@ -238,7 +238,10 @@ let render_lines ?terminal_width ?cursor_byte ?(preview = false)
     in
     let lines =
       prompt_line
-      :: clip_line (format_status ~multi_selected_count ~preview ~result_count ~selected)
+      :: clip_line
+           (format_status
+              ~multi_selected_count:(Option.map List.length marked_candidate_ids)
+              ~preview ~result_count ~selected)
       :: body
     in
     let rec take remaining acc = function

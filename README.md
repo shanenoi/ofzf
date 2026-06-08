@@ -46,7 +46,8 @@ technical-debt stabilization passes:
 - Cursor-aware interactive query editing with Left/Right, Home/End, Ctrl-A,
   Ctrl-E, Backspace, Delete/Ctrl-D, Ctrl-U, and Ctrl-W.
 - Optional `--multi` interactive mode where Space toggles marked candidates and
-  Enter prints all marked candidates, one per line.
+  Enter prints all marked candidates, one per line, preserving duplicate input
+  rows as distinct selectable results.
 - Selection clamping and viewport recalculation after result shrink or terminal
   resize checks.
 - Width-aware text helpers for safer interactive rendering of ASCII, tabs,
@@ -148,8 +149,9 @@ dune exec ofzf -- --multi < candidates.txt
 ```
 
 In multi-select mode, Space toggles the highlighted candidate. Enter prints all
-marked candidates to stdout in original input order; if nothing is marked, Enter
-prints the highlighted candidate like normal single-select mode.
+marked candidates to stdout in original input order; duplicate input rows can be
+marked independently. If nothing is marked, Enter prints the highlighted
+candidate like normal single-select mode.
 
 With preview enabled, if a selected candidate is a readable regular file path,
 the preview pane shows file contents. It never executes the selected candidate

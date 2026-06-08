@@ -23,8 +23,7 @@ val render_lines :
   ?preview_position:Preview.position ->
   ?preview_content:Preview.content ->
   ?preview_scroll:int ->
-  ?marked_candidates:string list ->
-  ?multi_selected_count:int ->
+  ?marked_candidate_ids:int list ->
   terminal_height:int ->
   query:string ->
   selected:int ->

@@ -46,7 +46,8 @@ cat input.txt | ofzf --multi --preview matcher
 
 Space toggles the highlighted result. Marked candidates stay marked across query
 changes even when the current query hides them, because the marked set is kept
-against the full stdin candidate list rather than the visible result page.
+against original stdin row indexes rather than the visible result page. This
+means duplicate candidate text can be marked independently.
 
 Enter prints marked candidates in original input order, one per line. If no
 candidates are marked, Enter prints the highlighted candidate exactly like normal
@@ -173,7 +174,7 @@ the search context.
 
 Query-cache growth is bounded by default, but interactive mode still retains the
 candidate list itself. Future versions can add candidate metadata caches,
-candidate IDs, and background indexing.
+compact cached references, and background indexing.
 
 ## Current limitations
 
