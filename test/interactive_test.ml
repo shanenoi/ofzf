@@ -3,7 +3,13 @@ open Test_support
 let () =
   assert_true "parse arrow up" (Ofzf.Terminal.parse_key_sequence "\027[A" = Ofzf.Terminal.Arrow_up);
   assert_true "parse arrow down" (Ofzf.Terminal.parse_key_sequence "\027[B" = Ofzf.Terminal.Arrow_down);
+  assert_true "parse arrow left" (Ofzf.Terminal.parse_key_sequence "\027[D" = Ofzf.Terminal.Arrow_left);
+  assert_true "parse arrow right" (Ofzf.Terminal.parse_key_sequence "\027[C" = Ofzf.Terminal.Arrow_right);
+  assert_true "parse home" (Ofzf.Terminal.parse_key_sequence "\027[H" = Ofzf.Terminal.Home);
+  assert_true "parse end" (Ofzf.Terminal.parse_key_sequence "\027[F" = Ofzf.Terminal.End);
+  assert_true "parse delete" (Ofzf.Terminal.parse_key_sequence "\027[3~" = Ofzf.Terminal.Delete);
   assert_true "parse backspace" (Ofzf.Terminal.parse_key_sequence "\127" = Ofzf.Terminal.Backspace);
+  assert_true "parse ctrl-a" (Ofzf.Terminal.parse_key_sequence "\001" = Ofzf.Terminal.Ctrl_a);
   assert_true "parse ctrl-u" (Ofzf.Terminal.parse_key_sequence "\021" = Ofzf.Terminal.Ctrl_u);
   assert_true "parse ctrl-w" (Ofzf.Terminal.parse_key_sequence "\023" = Ofzf.Terminal.Ctrl_w);
   assert_true "parse ctrl-b" (Ofzf.Terminal.parse_key_sequence "\002" = Ofzf.Terminal.Ctrl_b);
@@ -31,6 +37,21 @@ let () =
     (Ofzf.Interactive.apply_key_to_query Ofzf.Terminal.Ctrl_w ~query:"matcher fuzzy");
   assert_equal_string "unknown escape ignores query" "mat"
     (Ofzf.Interactive.apply_key_to_query (Ofzf.Terminal.Unknown "\027[Z") ~query:"mat");
+  let open Ofzf.Query_edit in
+  let edit = make ~cursor:1 "mt" in
+  let edited = Ofzf.Interactive.apply_key_to_query_edit (Ofzf.Terminal.Character 'a') edit in
+  assert_equal_string "interactive insert at cursor" "mat" (query edited);
+  assert_equal_int "interactive insert advances cursor" 2 (cursor edited);
+  let moved = Ofzf.Interactive.apply_key_to_query_edit Ofzf.Terminal.Arrow_left edited in
+  assert_equal_string "interactive arrow-left preserves query" "mat" (query moved);
+  assert_equal_int "interactive arrow-left moves cursor" 1 (cursor moved);
+  let deleted = Ofzf.Interactive.apply_key_to_query_edit Ofzf.Terminal.Delete moved in
+  assert_equal_string "interactive delete at cursor" "mt" (query deleted);
+  assert_equal_int "interactive delete keeps cursor" 1 (cursor deleted);
+  let start = Ofzf.Interactive.apply_key_to_query_edit Ofzf.Terminal.Ctrl_a edited in
+  assert_equal_int "interactive ctrl-a moves start" 0 (cursor start);
+  let finish = Ofzf.Interactive.apply_key_to_query_edit Ofzf.Terminal.Ctrl_e start in
+  assert_equal_int "interactive ctrl-e moves end" 3 (cursor finish);
   assert_equal_int "preview line down delta" 1
     (Option.get (Ofzf.Interactive.preview_scroll_delta ~visible_rows:5 Ofzf.Terminal.Ctrl_e));
   assert_equal_int "preview page down delta" 5

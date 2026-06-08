@@ -4,8 +4,7 @@
 rendering dependency; the interactive loop maps decoded terminal keys to
 `Query_edit.action` values and then applies them to query state.
 
-The module supports cursor-aware operations even though the current interactive
-path remains append-oriented for backward compatibility:
+The module supports the cursor-aware operations used by interactive mode:
 
 - printable character insertion;
 - Backspace before the cursor;
@@ -19,6 +18,7 @@ practical so editing avoids splitting decoded cells for common UTF-8 input. This
 is still not a complete grapheme-aware editor; full Unicode query editing remains
 deferred.
 
-`Interactive.apply_key_to_query` is now a compatibility wrapper over
-`Query_edit.apply_append_action`, so existing append/backspace behavior remains
-unchanged while tests can exercise the lower-level cursor-aware helpers directly.
+`Interactive` keeps the cursor in its UI state, maps decoded terminal keys to
+`Query_edit` actions, and reruns search only when the query text changes. The
+older `Interactive.apply_key_to_query` helper remains as an append-mode
+compatibility wrapper for tests and callers that only need the final query text.

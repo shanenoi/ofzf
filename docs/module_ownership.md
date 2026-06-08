@@ -11,7 +11,7 @@ larger features such as multi-select or command-based previews.
 | `Topk` | Bounded stable best-K heap and sorted finalization. | Matching or scoring policy. |
 | `Search_engine` | Full/incremental search orchestration and search statistics. | Terminal rendering, raw mode, preview loading. |
 | `Query_cache` | Exact/prefix query result reuse and bounded cache memory. | Ranking, terminal UI. |
-| `Query_edit` | Pure query text edits. | Terminal raw-mode reads or ANSI rendering. |
+| `Query_edit` | Pure query text edits, byte cursor movement, and UTF-8-boundary clamping. | Terminal raw-mode reads or ANSI rendering. |
 | `Selection` | Selected-row movement and preservation. | Terminal IO, candidate loading. |
 | `Viewport` | Result-window calculations using actual layout bounds. | ANSI string construction, filesystem IO. |
 | `Text_width` | UTF-8-safe display width, clipping, and ANSI-width helpers. | Fuzzy matching or scoring. |
@@ -19,7 +19,7 @@ larger features such as multi-select or command-based previews.
 | `Preview_state` | Selected preview candidate, loaded preview content, and scroll offset. | ANSI frame rendering. |
 | `Render` | Pure ANSI frame/result/preview rendering from already-loaded state. | Filesystem IO and terminal raw-mode lifecycle. |
 | `Terminal` | Raw mode, alternate screen, key parsing, terminal size, ANSI primitives. | Search/ranking policy. |
-| `Interactive` | Terminal lifecycle, event loop, state transitions. | Low-level matching/scoring policy or direct preview rendering details. |
+| `Interactive` | Terminal lifecycle, event loop, cursor/query state transitions. | Low-level matching/scoring policy or direct preview rendering details. |
 | `Cli` | Deterministic argument parsing and validation. | Search execution or terminal IO. |
 | `Debug` | Opt-in debug logs to stderr. | Normal stdout output or file-content logging. |
 

@@ -17,6 +17,7 @@ val render_preview_box : width:int -> height:int -> scroll:int -> Preview.conten
 
 val render_lines :
   ?terminal_width:int ->
+  ?cursor_byte:int ->
   ?preview:bool ->
   ?preview_position:Preview.position ->
   ?preview_content:Preview.content ->

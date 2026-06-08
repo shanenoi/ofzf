@@ -88,8 +88,9 @@ searches do not retain every matching candidate.
 
 `lib/query_edit.ml` owns pure query editing. It supports insert/delete,
 Backspace, Ctrl-U, Ctrl-W, cursor clamping, and cursor movement helpers without
-depending on terminal raw mode or rendering. `Interactive` maps decoded keys to
-query-edit actions and keeps current append-oriented behavior through a wrapper.
+depending on terminal raw mode or rendering. `Interactive` stores the query byte
+cursor, maps decoded keys to query-edit actions, reruns search only when text
+changes, and asks `Render` to position the terminal cursor in the prompt.
 
 ### Selection and viewport
 

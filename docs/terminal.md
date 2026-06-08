@@ -49,6 +49,9 @@ Raw key input is byte-oriented. The current MVP decodes:
 - printable character bytes as `Character c`;
 - `\r` and `\n` as Enter;
 - `\b` and DEL as Backspace;
+- Delete/Ctrl-D as query delete-at-cursor;
+- Ctrl-A/Ctrl-E as query start/end when preview mode does not consume Ctrl-E
+  for scrolling;
 - Ctrl-B/Ctrl-F as preview page up/down;
 - Ctrl-E/Ctrl-Y as preview line down/up;
 - Ctrl-U as `Ctrl_u`;
@@ -57,6 +60,9 @@ Raw key input is byte-oriented. The current MVP decodes:
 - bare Escape as `Escape`;
 - `ESC [ A` as Arrow Up;
 - `ESC [ B` as Arrow Down;
+- `ESC [ C` / `ESC [ D` as Arrow Right / Arrow Left;
+- common Home / End sequences;
+- `ESC [ 3 ~` as Delete;
 - `ESC [ 5 ~` / `ESC [ 6 ~` as Page Up / Page Down;
 - common Alt-Up / Alt-Down sequences where practical;
 - SIGWINCH resize notifications as `Resize` events.
@@ -110,7 +116,8 @@ layout. Non-interactive output is not clipped.
 - Resize handling is SIGWINCH-aware but still redraws whole frames rather than
   doing partial terminal updates.
 - No mouse input.
-- No UTF-8-aware editing; Backspace removes one byte.
+- Query editing avoids UTF-8 continuation-byte splits where practical, but full
+  grapheme-cluster editing remains deferred.
 - No async input or background indexing.
 
 ## Unicode-safe width helpers

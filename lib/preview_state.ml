@@ -34,13 +34,19 @@ let scroll_delta ~visible_rows = function
   | Terminal.Ctrl_f -> Some (max 1 visible_rows)
   | Terminal.Character _
   | Terminal.Backspace
+  | Terminal.Delete
+  | Terminal.Ctrl_a
   | Terminal.Ctrl_u
   | Terminal.Ctrl_w
   | Terminal.Ctrl_c
   | Terminal.Enter
   | Terminal.Escape
+  | Terminal.Arrow_left
+  | Terminal.Arrow_right
   | Terminal.Arrow_up
   | Terminal.Arrow_down
+  | Terminal.Home
+  | Terminal.End
   | Terminal.Page_up
   | Terminal.Page_down
   | Terminal.Resize

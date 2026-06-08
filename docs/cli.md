@@ -49,8 +49,11 @@ the previous terminal mode on Enter, Escape, Ctrl-C, and errors where practical.
 
 Supported keys:
 
-- printable characters append to the query;
-- Backspace removes one byte from the query;
+- printable characters insert at the query cursor;
+- Left/Right moves the query cursor;
+- Home/Ctrl-A and End/Ctrl-E move to query start/end;
+- Backspace removes before the cursor;
+- Delete/Ctrl-D removes at the cursor;
 - Ctrl-U clears the query;
 - Ctrl-W deletes the previous whitespace-delimited query word;
 - Arrow Up/Down moves the selected row;

@@ -124,9 +124,9 @@ let render_result_lines ~result_width ~query ~selected ~start ~stop results =
     |> List.map (fun (index, result) ->
            render_result_line ~terminal_width:result_width ~selected:(index = selected) result)
 
-let render_lines ?terminal_width ?(preview = false) ?(preview_position = Preview.Right)
-    ?(preview_content = Preview.no_selection_content) ?(preview_scroll = 0)
-    ~terminal_height ~query ~selected results =
+let render_lines ?terminal_width ?cursor_byte ?(preview = false)
+    ?(preview_position = Preview.Right) ?(preview_content = Preview.no_selection_content)
+    ?(preview_scroll = 0) ~terminal_height ~query ~selected results =
   if terminal_height <= 0 then []
   else
     let result_count = List.length results in
@@ -193,7 +193,8 @@ let render_lines ?terminal_width ?(preview = false) ?(preview_position = Preview
       match terminal_width with
       | None -> "> " ^ Text_width.sanitize query
       | Some terminal_width ->
-          (render_prompt ~cursor_byte:(String.length query) ~terminal_width ~query).Text_width.visible
+          let cursor_byte = Option.value cursor_byte ~default:(String.length query) in
+          (render_prompt ~cursor_byte ~terminal_width ~query).Text_width.visible
     in
     let lines = prompt_line :: clip_line (format_status ~preview ~result_count ~selected) :: body in
     let rec take remaining acc = function

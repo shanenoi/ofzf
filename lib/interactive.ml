@@ -6,6 +6,7 @@ type preview_state = Preview_state.t = {
 
 type state = {
   query : string;
+  cursor : int;
   context : Search_engine.search_context;
   results : Matcher.match_result list;
   selected : int;
@@ -34,11 +35,19 @@ let update_preview_state = Preview_state.update
 let clamp_preview_state_scroll = Preview_state.clamp_scroll
 
 let query_action_of_key = function
+  | Terminal.Ctrl_a | Terminal.Home -> Query_edit.Move_start
+  | Terminal.Ctrl_e | Terminal.End -> Query_edit.Move_end
+  | Terminal.Arrow_left -> Query_edit.Move_left
+  | Terminal.Arrow_right -> Query_edit.Move_right
   | Terminal.Ctrl_u -> Query_edit.Clear
   | Terminal.Ctrl_w -> Query_edit.Delete_previous_word
   | Terminal.Backspace -> Query_edit.Backspace
+  | Terminal.Delete -> Query_edit.Delete
   | Terminal.Character char -> Query_edit.Insert char
   | _ -> Query_edit.Ignore
+
+let apply_key_to_query_edit key edit =
+  Query_edit.apply (query_action_of_key key) edit
 
 let apply_key_to_query key ~query =
   Query_edit.apply_append_action (query_action_of_key key) ~query
@@ -65,7 +74,8 @@ let sync_preview_state ?loader state =
     let preview_state = update_preview_state ?loader state.preview_state selected_candidate in
     { state with preview_state }
 
-let recompute candidates state query =
+let recompute candidates state edit =
+  let query = Query_edit.query edit in
   let previous_candidate = selected_candidate_text ~selected:state.selected state.results in
   let search = Search_engine.incremental_search ~context:state.context ~query candidates in
   let selected =
@@ -75,6 +85,7 @@ let recompute candidates state query =
   {
     state with
     query;
+    cursor = Query_edit.cursor edit;
     context = search.context;
     results = search.results;
     selected;
@@ -88,6 +99,7 @@ let initial_state ?(preview = false) ?(preview_position = Preview.Right) ?(initi
   in
   {
     query = initial_query;
+    cursor = String.length initial_query;
     context = search.context;
     results = search.results;
     selected = 0;
@@ -101,13 +113,14 @@ let render_line handle line = Terminal.write handle (line ^ "\n")
 
 let render handle terminal_size state =
   let prompt =
-    render_prompt ~cursor_byte:(String.length state.query)
-      ~terminal_width:terminal_size.Terminal.cols ~query:state.query
+    render_prompt ~cursor_byte:state.cursor ~terminal_width:terminal_size.Terminal.cols
+      ~query:state.query
   in
   Terminal.move_cursor handle ~row:1 ~col:1;
   Terminal.clear_screen handle;
   Terminal.move_cursor handle ~row:1 ~col:1;
   render_lines ~terminal_height:terminal_size.rows ~terminal_width:terminal_size.cols
+    ~cursor_byte:state.cursor
     ~preview:state.preview ~preview_position:state.preview_position
     ~preview_content:state.preview_state.content ~preview_scroll:state.preview_state.scroll
     ~query:state.query ~selected:state.selected state.results
@@ -142,6 +155,13 @@ let apply_preview_scroll_key ~visible_rows key state =
 
 let update_selection selected state =
   { state with selected } |> sync_preview_state
+
+let apply_query_key_to_state key state =
+  let before = Query_edit.make ~cursor:state.cursor state.query in
+  let after = apply_key_to_query_edit key before in
+  if Query_edit.query after = state.query then
+    `Cursor_only { state with cursor = Query_edit.cursor after }
+  else `Query_changed after
 
 let page_size_for_selection ~terminal_height ~terminal_width state =
   max 1
@@ -188,8 +208,9 @@ let run_loop handle ~preview:handle_preview ~preview_position:handle_preview_pos
               in
               loop state
             else
-              let query = apply_key_to_query key ~query:state.query in
-              if query = state.query then loop state else loop (recompute candidates state query))
+              (match apply_query_key_to_state key state with
+              | `Cursor_only state -> loop state
+              | `Query_changed edit -> loop (recompute candidates state edit)))
     | key when is_selection_key key ->
         let page_size = page_size_for_selection ~terminal_height:size.rows ~terminal_width:size.cols state in
         let selected =
@@ -198,8 +219,9 @@ let run_loop handle ~preview:handle_preview ~preview_position:handle_preview_pos
         in
         loop { state with selected }
     | key ->
-        let query = apply_key_to_query key ~query:state.query in
-        if query = state.query then loop state else loop (recompute candidates state query)
+        (match apply_query_key_to_state key state with
+        | `Cursor_only state -> loop state
+        | `Query_changed edit -> loop (recompute candidates state edit))
   in
   loop
     (initial_state ~preview:handle_preview ~preview_position:handle_preview_position

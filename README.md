@@ -13,7 +13,7 @@ original non-interactive fuzzy-filter behavior.
 
 ## Current status
 
-Implemented through v0.16 Heap-Based Top-K plus three
+Implemented through v0.17 Cursor-Aware Query Editing plus three
 technical-debt stabilization passes:
 
 - Case-insensitive subsequence fuzzy matching.
@@ -43,6 +43,8 @@ technical-debt stabilization passes:
 - Clipped interactive row rendering so long candidates do not break layout.
 - Ctrl-U query clear, Ctrl-W previous-word deletion, and safer unknown escape
   handling.
+- Cursor-aware interactive query editing with Left/Right, Home/End, Ctrl-A,
+  Ctrl-E, Backspace, Delete/Ctrl-D, Ctrl-U, and Ctrl-W.
 - Selection clamping and viewport recalculation after result shrink or terminal
   resize checks.
 - Width-aware text helpers for safer interactive rendering of ASCII, tabs,

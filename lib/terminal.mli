@@ -7,6 +7,8 @@
 type key =
   | Character of char
   | Backspace
+  | Delete
+  | Ctrl_a
   | Ctrl_b
   | Ctrl_e
   | Ctrl_f
@@ -16,8 +18,12 @@ type key =
   | Ctrl_c
   | Enter
   | Escape
+  | Arrow_left
+  | Arrow_right
   | Arrow_up
   | Arrow_down
+  | Home
+  | End
   | Alt_up
   | Alt_down
   | Page_up

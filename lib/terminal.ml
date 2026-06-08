@@ -1,6 +1,8 @@
 type key =
   | Character of char
   | Backspace
+  | Delete
+  | Ctrl_a
   | Ctrl_b
   | Ctrl_e
   | Ctrl_f
@@ -10,8 +12,12 @@ type key =
   | Ctrl_c
   | Enter
   | Escape
+  | Arrow_left
+  | Arrow_right
   | Arrow_up
   | Arrow_down
+  | Home
+  | End
   | Alt_up
   | Alt_down
   | Page_up
@@ -48,8 +54,10 @@ let selected_end_highlight = "\027[22;24;7m"
 let resize_pending = ref false
 
 let parse_key_sequence = function
+  | "\001" -> Ctrl_a
   | "\002" -> Ctrl_b
   | "\003" -> Ctrl_c
+  | "\004" -> Delete
   | "\005" -> Ctrl_e
   | "\006" -> Ctrl_f
   | "\021" -> Ctrl_u
@@ -58,8 +66,13 @@ let parse_key_sequence = function
   | "\r" | "\n" -> Enter
   | "\b" | "\127" -> Backspace
   | "\027" -> Escape
+  | "\027[C" -> Arrow_right
+  | "\027[D" -> Arrow_left
   | "\027[A" -> Arrow_up
   | "\027[B" -> Arrow_down
+  | "\027[H" | "\027[1~" | "\027[7~" -> Home
+  | "\027[F" | "\027[4~" | "\027[8~" -> End
+  | "\027[3~" -> Delete
   | "\027\027[A" | "\027[1;3A" -> Alt_up
   | "\027\027[B" | "\027[1;3B" -> Alt_down
   | "\027[5~" -> Page_up

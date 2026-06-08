@@ -7,6 +7,15 @@ let assert_size message expected actual =
   assert_equal_int (message ^ " cols") expected.Ofzf.Terminal.cols actual.Ofzf.Terminal.cols
 
 let () =
+  assert_true "parse ctrl-a" (Ofzf.Terminal.parse_key_sequence "\001" = Ofzf.Terminal.Ctrl_a);
+  assert_true "parse delete" (Ofzf.Terminal.parse_key_sequence "\027[3~" = Ofzf.Terminal.Delete);
+  assert_true "parse ctrl-d as delete" (Ofzf.Terminal.parse_key_sequence "\004" = Ofzf.Terminal.Delete);
+  assert_true "parse arrow left" (Ofzf.Terminal.parse_key_sequence "\027[D" = Ofzf.Terminal.Arrow_left);
+  assert_true "parse arrow right" (Ofzf.Terminal.parse_key_sequence "\027[C" = Ofzf.Terminal.Arrow_right);
+  assert_true "parse home" (Ofzf.Terminal.parse_key_sequence "\027[H" = Ofzf.Terminal.Home);
+  assert_true "parse home alternate" (Ofzf.Terminal.parse_key_sequence "\027[1~" = Ofzf.Terminal.Home);
+  assert_true "parse end" (Ofzf.Terminal.parse_key_sequence "\027[F" = Ofzf.Terminal.End);
+  assert_true "parse end alternate" (Ofzf.Terminal.parse_key_sequence "\027[4~" = Ofzf.Terminal.End);
   assert_size "normalize keeps positive size" (size 12 40)
     (Ofzf.Terminal.normalize_size ~fallback:(size 24 100) (size 12 40));
   assert_size "normalize replaces non-positive rows and cols" (size 24 100)

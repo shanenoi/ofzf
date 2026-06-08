@@ -32,6 +32,10 @@ val delete_previous_word : string -> string
 val apply_key_to_query : Terminal.key -> query:string -> string
 (** Pure query editing helper. Non-editing keys leave the query unchanged. *)
 
+val apply_key_to_query_edit : Terminal.key -> Query_edit.t -> Query_edit.t
+(** Cursor-aware query editing helper. Non-editing keys leave query and cursor
+    unchanged. *)
+
 val apply_key_to_selection : ?page_size:int -> Terminal.key -> selected:int -> result_count:int -> int
 (** Pure selection movement helper. *)
 
@@ -61,6 +65,7 @@ val render_preview_pane :
 
 val render_lines :
   ?terminal_width:int ->
+  ?cursor_byte:int ->
   ?preview:bool ->
   ?preview_position:Preview.position ->
   ?preview_content:Preview.content ->

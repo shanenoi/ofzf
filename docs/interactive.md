@@ -35,12 +35,12 @@ does not contaminate stdout.
 
 ## Query editing
 
-The query starts empty. Printable character keys append to the query through
-`Query_edit`, Backspace is safe on an empty query, Ctrl-U clears, and Ctrl-W
-deletes the previous whitespace-delimited word. The current UI path remains
-append-oriented for compatibility, while `Query_edit` exposes cursor-aware pure
-helpers for future in-query editing. Every query edit runs
-`Search_engine.incremental_search`:
+The query starts empty. Printable character keys insert at the current cursor
+through `Query_edit`. Left/Right move the query cursor, Home/Ctrl-A moves to the
+start, End/Ctrl-E moves to the end, Backspace removes the character before the
+cursor, Delete/Ctrl-D removes the character at the cursor, Ctrl-U clears, and
+Ctrl-W deletes the previous whitespace-delimited word. Cursor-only movement does
+not rerun search; text changes run `Search_engine.incremental_search`:
 
 ```text
 old query + candidate cache + new query
@@ -121,8 +121,10 @@ normal key. Each redraw recalculates the viewport and keeps the selected row
 visible. Very small heights produce fewer or zero result rows instead of writing
 past the screen.
 
-Prompt, status, and result rows are clipped to terminal width. This keeps long
-paths from breaking the layout while preserving non-interactive output exactly
+Prompt, status, and result rows are clipped to terminal width. The prompt keeps
+the query cursor visible where practical and positions the terminal cursor after
+the prompt prefix plus the visible query prefix. This keeps long paths or long
+queries from breaking the layout while preserving non-interactive output exactly
 as before.
 
 ## Alternate screen
@@ -159,7 +161,8 @@ candidate IDs, and background indexing.
 - No multi-select.
 - No mouse support.
 - Resize handling is signal-aware but still full-frame rather than partial.
-- Query editing is byte/cell-boundary based rather than fully grapheme-aware.
+- Query editing avoids splitting UTF-8 byte sequences where practical, but it is
+  still byte/cell-boundary based rather than fully grapheme-aware.
 - Highlighting is byte-position-based, matching the current matcher API.
 
 ## Unicode and display width

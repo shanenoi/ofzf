@@ -6,7 +6,8 @@ logging for future troubleshooting. v0.14 promotes that process-level coverage
 into the default Dune test workflow. v0.15 keeps ranking behavior stable while
 reducing repeated query/candidate normalization on the search hot path. v0.16
 replaces the streaming Top-K bounded-list path with a heap-backed accumulator for
-large-limit performance.
+large-limit performance. v0.17 wires the existing cursor-aware query-editing
+model into the interactive loop and renderer.
 
 Completed in this pass:
 
@@ -29,13 +30,15 @@ Completed in this pass:
   shorter than the query before scanning;
 - top-k selection now uses a heap accumulator while preserving final best-first
   ordering and stable tie behavior;
+- interactive query editing supports cursor movement, in-query insertion,
+  Backspace/Delete, Home/End, Ctrl-A/Ctrl-E, Ctrl-U, and Ctrl-W;
 - small preview fixtures cover Unicode names, long names, CRLF, binary-looking
   content, directories, and missing paths;
 - `OFZF_DEBUG=1` writes concise diagnostics to stderr without changing stdout.
 
 Deferred work:
 
-- full grapheme-aware query editing;
+- full grapheme-cluster-aware query editing;
 - command-based preview with a safe command model.
 
 Recommended next cleanup order:
