@@ -58,6 +58,8 @@ technical-debt stabilization passes:
 - Optional interactive preview foundation with right-side or bottom layouts.
 - `--preview` previews readable regular files, or falls back to selected
   candidate text for non-path candidates, without executing commands.
+- Safe command-preview behavior is designed in `docs/command_preview.md`, but
+  command execution is not implemented yet.
 - Preview CLI validation is deterministic: preview is rejected with `--bench`,
   `--limit`, or a standalone `--preview-position`.
 - Preview content is loaded only when the selected candidate changes; rendering

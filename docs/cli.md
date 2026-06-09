@@ -182,7 +182,9 @@ with a clear message. `--preview-position` is valid only when `--preview` is
 also present. `--preview` is intentionally rejected with `--bench` and with
 `--limit N`; benchmark mode and top-k streaming mode stay non-interactive.
 External preview commands, shell expansion, and `{}` placeholder expansion are
-intentionally out of scope.
+not implemented. The planned safe command-preview design is documented in
+`docs/command_preview.md`; the first implementation should use argv-based
+execution instead of shell strings.
 
 Preview can be combined with `--multi`, so users can mark multiple candidates
 while still previewing the highlighted row.

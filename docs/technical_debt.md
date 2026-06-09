@@ -8,7 +8,8 @@ reducing repeated query/candidate normalization on the search hot path. v0.16
 replaces the streaming Top-K bounded-list path with a heap-backed accumulator for
 large-limit performance. v0.17 wires the existing cursor-aware query-editing
 model into the interactive loop and renderer. v0.18 adds interactive multi-select
-without moving selection mutation into rendering or search.
+without moving selection mutation into rendering or search. v0.19 records the
+safe command-preview design before any shell-facing preview behavior is added.
 
 Completed in this pass:
 
@@ -44,15 +45,20 @@ Completed in this pass:
 - small preview fixtures cover Unicode names, long names, CRLF, binary-looking
   content, directories, and missing paths;
 - `OFZF_DEBUG=1` writes concise diagnostics to stderr without changing stdout.
+- `docs/command_preview.md` defines an argv-only, no-shell command-preview
+  design for v0.20.
 
 Deferred work:
 
 - full grapheme-cluster-aware query editing;
-- command-based preview with a safe command model.
+- implementing the argv-only command-preview design;
+- fixed preview-command arguments, shell opt-in, `{}` interpolation, async
+  workers, streaming output, custom environments, and multi-selected command
+  previews.
 
 Recommended next cleanup order:
 
-1. add command-preview design docs before implementing any shell-facing feature;
+1. implement the argv-only command-preview path from `docs/command_preview.md`;
 2. revisit query editing with full grapheme-cluster behavior;
 3. consider extracting an `Interactive_update` module if the event loop grows
    during command-preview or richer keybinding work;

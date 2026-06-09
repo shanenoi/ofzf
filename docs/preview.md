@@ -1,9 +1,12 @@
 # Preview Window
 
 `ofzf` v0.12 extends the preview-window foundation with safe file-content
-preview and preview scrolling. The preview is intentionally synchronous and
-does not execute external commands, expand shell syntax, or interpret `{}`
-placeholders yet.
+preview and preview scrolling. The implemented preview is intentionally
+synchronous and does not execute external commands, expand shell syntax, or
+interpret `{}` placeholders.
+
+v0.19 adds a design for future safe command preview in
+`docs/command_preview.md`. Command execution is not implemented yet.
 
 ## CLI options
 
@@ -102,6 +105,11 @@ Command-based previews are useful but security-sensitive. The current preview pa
 avoids shell execution, placeholder expansion, and arbitrary command strings.
 This gives the project a tested layout and rendering foundation before adding a
 controlled command model in a later milestone.
+
+The planned first command-preview model is argv-based rather than shell-based:
+`--preview-command cat` would execute `cat` with the selected candidate as one
+argv argument. It would not run through a shell and would not expand `{}`. See
+`docs/command_preview.md` for the v0.20 implementation plan.
 
 ## Limitations
 
