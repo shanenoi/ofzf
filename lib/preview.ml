@@ -287,14 +287,14 @@ let run_command ~timeout_ms ~max_bytes command candidate =
           let stdout_truncated = ref false in
           let stderr_truncated = ref false in
           let deadline = Unix.gettimeofday () +. (float_of_int timeout_ms /. 1000.0) in
-          let rec poll_status () =
+          let poll_status () =
             try
               match Unix.waitpid [ Unix.WNOHANG ] pid with
               | 0, _ -> None
               | _, status -> Some status
             with Unix.Unix_error (Unix.ECHILD, _, _) -> Some (Unix.WEXITED 0)
           in
-          let rec drain_if_ready fd_ref fd buffer truncated =
+          let drain_if_ready fd_ref fd buffer truncated =
             if !fd_ref then
               match read_available fd buffer ~max_bytes ~truncated:!truncated with
               | `Open value -> truncated := value
