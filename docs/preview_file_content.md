@@ -51,12 +51,12 @@ bindings are:
 Page Up and Page Down remain result-list navigation keys. Preview scroll resets
 when the selected candidate changes or when the query is recomputed.
 
-## Why shell preview commands are deferred
+## Command preview boundary
 
-Preview commands are powerful but security-sensitive. v0.12 still does not run
-arbitrary shell strings, expand `{}` placeholders, or invoke the shell. A future
-milestone can add command-based preview using an explicit, audited execution
-model on top of this file-content foundation.
+Preview commands are powerful but security-sensitive. The command-preview path
+is separate from this file-content path and uses the explicit argv-only model in
+`docs/command_preview.md`. It still does not run arbitrary shell strings,
+expand `{}` placeholders, or invoke the shell.
 
 ## Limitations
 
@@ -64,4 +64,5 @@ model on top of this file-content foundation.
 - Only the first 256 KiB of a file is read.
 - Binary detection is heuristic.
 - No async workers or cancellation yet.
-- No external preview commands or shell integration yet.
+- No shell integration, fixed preview-command arguments, or placeholder
+  expansion.

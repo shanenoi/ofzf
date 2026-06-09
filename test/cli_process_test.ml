@@ -69,6 +69,18 @@ let () =
   assert_error "preview limit" (run_ofzf bin [ "--preview"; "--limit"; "1"; "he" ])
     ~needle:"cannot be combined with --limit";
 
+  assert_error "preview command missing value" (run_ofzf bin [ "--preview-command" ])
+    ~needle:"expected command";
+
+  assert_error "preview command whitespace rejected" (run_ofzf bin [ "--preview-command"; "cat -n" ])
+    ~needle:"without whitespace";
+
+  assert_error "preview command bench" (run_ofzf bin [ "--preview-command"; "cat"; "--bench"; "he" ])
+    ~needle:"cannot be combined with --bench";
+
+  assert_error "preview command limit" (run_ofzf bin [ "--preview-command"; "cat"; "--limit"; "1"; "he" ])
+    ~needle:"cannot be combined with --limit";
+
   assert_error "multi bench" (run_ofzf bin [ "--multi"; "--bench"; "he" ])
     ~needle:"cannot be combined with --bench";
 
@@ -84,6 +96,9 @@ let () =
 
   let preview_bottom = run_ofzf bin [ "--preview"; "--preview-position"; "bottom"; "he" ] in
   assert_error "preview bottom non-tty" preview_bottom ~needle:"cannot start interactive terminal";
+
+  let preview_command = run_ofzf bin [ "--preview-command"; "cat"; "he" ] in
+  assert_error "preview command non-tty" preview_command ~needle:"cannot start interactive terminal";
 
   let debug = run_debug bin [ "he" ] in
   assert_process_exit "debug search exits zero" 0 debug;

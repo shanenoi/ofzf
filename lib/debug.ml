@@ -16,3 +16,5 @@ let preview_kind_to_string = function
   | Preview.Missing_path -> "missing-path"
   | Preview.Unreadable_path -> "unreadable-path"
   | Preview.Binary_file -> "binary-file"
+  | Preview.Command_output -> "command-output"
+  | Preview.Command_error -> "command-error"

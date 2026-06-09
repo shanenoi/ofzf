@@ -1,12 +1,8 @@
 # Preview Window
 
-`ofzf` v0.12 extends the preview-window foundation with safe file-content
-preview and preview scrolling. The implemented preview is intentionally
-synchronous and does not execute external commands, expand shell syntax, or
-interpret `{}` placeholders.
-
-v0.19 adds a design for future safe command preview in
-`docs/command_preview.md`. Command execution is not implemented yet.
+`ofzf` supports safe file-content preview, preview scrolling, and a conservative
+command-preview mode. Command preview is intentionally synchronous and argv-only:
+it does not use a shell, expand shell syntax, or interpret `{}` placeholders.
 
 ## CLI options
 
@@ -15,11 +11,14 @@ ofzf --preview
 ofzf --preview QUERY
 ofzf --preview --preview-position right QUERY
 ofzf --preview --preview-position bottom QUERY
+ofzf --preview-command cat QUERY
+ofzf --preview-command cat --preview-position bottom QUERY
 ```
 
 `--preview-position` accepts `right` or `bottom`. Invalid values fail before
-interactive mode starts. `--preview-position` without `--preview` is rejected,
-as are `--preview --bench` and `--preview --limit N`, because preview mode is an
+interactive mode starts. `--preview-command COMMAND` implies `--preview`, so
+`--preview-position` is valid with either flag. Preview and command-preview
+forms are rejected with `--bench` and `--limit N`, because preview mode is an
 interactive UI path and those modes are non-interactive. Existing non-preview
 modes remain unchanged, including `--bench --limit N QUERY`.
 
@@ -52,11 +51,11 @@ The selected candidate is classified before rendering:
 - binary-looking file: omit raw bytes and show a binary message;
 - plain text: show the candidate text itself.
 
-Preview is file-read only. It does not invoke a shell, execute selected
-candidates, expand placeholders, or run user-provided preview commands.
-Symlinks follow the platform's normal `stat` behavior, so a readable symlink
-target may be previewed. Debug logs may include preview source kind and reload
-events, but they must not include preview file contents.
+File preview does not invoke a shell, execute selected candidates, expand
+placeholders, or run user-provided preview commands. Symlinks follow the
+platform's normal `stat` behavior, so a readable symlink target may be
+previewed. Debug logs may include preview source kind and reload events, but
+they must not include preview file contents.
 
 The missing-path vs plain-text decision uses a conservative path heuristic. A
 nonexistent value with path separators, dots, or common relative/home prefixes is
@@ -69,15 +68,16 @@ rows still use matcher positions for highlighting. Preview content uses
 `Text_width` clipping, so long candidate text is clipped by terminal display
 columns rather than bytes.
 
-Preview file loading is not part of frame rendering. The interactive state keeps
-the currently selected candidate, loaded `Preview.content`, and scroll offset.
-Content is reloaded only when the selected candidate changes; scroll is clamped
-against the already-loaded content.
+Preview loading is not part of frame rendering. The interactive state keeps the
+currently selected candidate, preview source, loaded `Preview.content`, and
+scroll offset. Content is reloaded only when the selected candidate or source
+changes; scroll is clamped against the already-loaded content.
 
 Technical Debt Pass 2 moved this ownership into `Preview_state` and moved frame
-composition into `Render`. `Preview` still owns filesystem classification and
-safe content loading; `Preview_state` decides when to call it; `Render` receives
-plain content data and performs no file IO.
+composition into `Render`. `Preview` owns filesystem classification, safe
+content loading, and command-preview execution policy; `Preview_state` decides
+when to call it; `Render` receives plain content data and performs no file IO or
+process spawning.
 
 The current preview pane renders a small border where practical, a status/title
 line, and clipped preview lines. If no result is selected, it shows a helpful
@@ -99,26 +99,40 @@ candidate. The scroll offset is clamped to valid content bounds.
 
 Page Up and Page Down remain result-list navigation keys.
 
-## Why commands are not executed yet
+## Command preview
 
-Command-based previews are useful but security-sensitive. The current preview path intentionally
-avoids shell execution, placeholder expansion, and arbitrary command strings.
-This gives the project a tested layout and rendering foundation before adding a
-controlled command model in a later milestone.
+Command-based previews are useful but security-sensitive, so v0.20 implements
+only the minimal argv model from `docs/command_preview.md`:
 
-The planned first command-preview model is argv-based rather than shell-based:
-`--preview-command cat` would execute `cat` with the selected candidate as one
-argv argument. It would not run through a shell and would not expand `{}`. See
-`docs/command_preview.md` for the v0.20 implementation plan.
+```text
+executable = COMMAND
+argv = [COMMAND; selected_candidate]
+```
+
+The command value must be a single executable name or path without whitespace.
+`--preview-command "cat -n"`, shell snippets, and `{}` interpolation are
+rejected or unsupported. Command stdout/stderr is captured and converted into
+`Preview.content`; it is never written to process stdout, which remains reserved
+for final selected candidates.
+
+If the command exits successfully, stdout is shown. If stdout is empty but
+stderr exists, stderr is shown with a clear preview label. Empty output,
+non-zero exits, missing commands, output truncation, and timeout are rendered as
+safe preview-pane messages. The highlighted candidate is passed even when it is
+an empty string. In `--multi` mode, command preview still follows only the
+highlighted row, not every marked row.
 
 ## Limitations
 
 - Preview reads at most 256 KiB from a selected file.
 - Preview loading is synchronous.
+- Command preview uses the same 256 KiB capture cap and a short synchronous
+  timeout.
 - Binary detection is heuristic.
 - No async preview execution.
 - No background workers.
-- No shell integration or placeholder expansion.
+- No shell integration, fixed command arguments, complex quoting language, or
+  placeholder expansion.
 - Preview can be combined with multi-select. The preview pane follows the
   highlighted row; marked candidates are still printed on Enter in input order.
 

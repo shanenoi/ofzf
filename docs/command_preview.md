@@ -1,12 +1,7 @@
-# Safe Command Preview Design
+# Safe Command Preview
 
-v0.19 is a design-only milestone. The current implemented preview remains
-file/text-only: it reads readable regular files directly, classifies directories,
-missing paths, unreadable paths, and binary-looking files, and never executes a
-command.
-
-This document defines the safe command-preview model intended for v0.20. The
-main rule is: **preview commands are argv-based, not shell strings**.
+v0.20 implements the v0.19 safe command-preview design. The main rule is:
+**preview commands are argv-based, not shell strings**.
 
 ## Goals
 
@@ -19,7 +14,7 @@ main rule is: **preview commands are argv-based, not shell strings**.
   receives already-loaded content.
 - Keep the feature testable without requiring a real interactive terminal.
 
-## Non-goals for v0.20
+## Non-goals
 
 - No shell commands such as `sh -c 'cat {} | head'`.
 - No `{}` placeholder interpolation.
@@ -32,7 +27,7 @@ main rule is: **preview commands are argv-based, not shell strings**.
 
 ## CLI shape
 
-Planned flag:
+Implemented flag:
 
 ```sh
 ofzf --preview-command cat
@@ -41,9 +36,9 @@ ofzf --preview-command cat --preview-position bottom QUERY
 ofzf --multi --preview-command cat QUERY
 ```
 
-`--preview-command COMMAND` should imply preview mode. Requiring both
+`--preview-command COMMAND` implies preview mode. Requiring both
 `--preview` and `--preview-command` would be more verbose without adding safety.
-Passing both is harmless and should parse the same as `--preview-command` alone.
+Passing both is harmless and parses the same as `--preview-command` alone.
 
 Valid combinations:
 
@@ -57,17 +52,19 @@ Invalid combinations:
 
 - `--preview-command` without `COMMAND`;
 - `--preview-command ""` if the parser can observe an empty command string;
+- `--preview-command --some-option`, because option-looking command values are
+  treated as invalid command input;
 - `--preview-command COMMAND --bench QUERY`;
 - `--preview-command COMMAND --limit N QUERY`;
 - `--preview-position right|bottom` without either `--preview` or
   `--preview-command`.
 
-`--preview-command` is interactive-only. It should not change non-interactive
+`--preview-command` is interactive-only. It does not change non-interactive
 search, `--limit`, or `--bench` behavior.
 
 ## Command execution model
 
-The v0.20 execution model should be intentionally small:
+The v0.20 execution model is intentionally small:
 
 ```text
 selected candidate:  "src/main.ml"
@@ -78,12 +75,14 @@ argv executed:       ["cat"; "src/main.ml"]
 Implementation rules:
 
 1. Do not run a shell by default.
-2. Resolve the executable with the platform's normal `execvp`/`PATH` behavior.
+2. Resolve the executable with `PATH`-style lookup or an executable path.
 3. Pass the selected candidate as exactly one argv argument.
 4. Do not interpolate selected text into a string.
 5. Do not split selected text on whitespace.
 6. Do not treat `{}` specially in v0.20.
 7. Do not support fixed command arguments in v0.20.
+8. Reject command values that are empty, contain whitespace, or look like CLI
+   options starting with `--`.
 
 Supporting command plus fixed arguments, for example `bat --color=always`, is
 useful but should be designed separately. It needs either repeated flags, a
@@ -102,15 +101,14 @@ Command preview must preserve these invariants:
 - stale preview results are not shown for a newer selected candidate;
 - missing commands and failures render safe messages instead of crashing the UI.
 
-Suggested constants for v0.20:
+Implemented constants:
 
 ```text
 max_preview_command_bytes = 256 KiB
 preview_command_timeout = 500 ms
 ```
 
-The byte cap should match the current file-preview cap unless benchmarking or
-real usage shows a need to separate them. The timeout should be short enough to
+The byte cap matches the current file-preview cap. The timeout is short enough to
 keep the interactive UI responsive while still allowing simple tools like `cat`
 or `head` to complete.
 
@@ -195,8 +193,8 @@ respects the byte cap. Otherwise prefer the timeout message alone for v0.20.
 
 ### Stale previews
 
-v0.20 may remain synchronous if implementation stays small and timeout-bounded.
-`Preview_state` should still key loaded content by selected candidate and command
+v0.20 remains synchronous and timeout-bounded. `Preview_state` keys loaded
+content by selected candidate and command
 configuration. If the selected candidate changes, the next reload replaces the
 old content and resets scroll.
 
@@ -206,7 +204,7 @@ preview.
 
 ## Architecture boundaries
 
-Planned ownership:
+Ownership:
 
 | Module | Command-preview responsibility |
 | --- | --- |
@@ -219,20 +217,20 @@ Planned ownership:
 | `Terminal` | No command-preview knowledge. |
 | `Search_engine`, `Matcher`, `Scoring`, `Topk` | No command-preview knowledge. |
 
-A small internal type can keep the boundary explicit in v0.20:
+A small type keeps the boundary explicit:
 
 ```ocaml
 type source =
-  | File_or_text
-  | Command of { executable : string }
+  | File_preview
+  | Command_preview of string
 ```
 
-`Preview.content_for_selection` can then receive `source` and the selected
-candidate. The existing file/text path remains the default.
+`Preview.content_for_selection` receives `source` and the selected candidate.
+The existing file/text path remains the default.
 
-## Testing plan for v0.20
+## Test coverage
 
-Parser tests:
+Parser tests cover:
 
 - `--preview-command cat` is valid and selects interactive preview mode;
 - `--preview --preview-command cat` is valid;
@@ -243,7 +241,7 @@ Parser tests:
 - `--preview-command cat --limit 10 query` is rejected;
 - `--preview-position right` is valid when `--preview-command cat` is present.
 
-Preview unit tests:
+Preview unit tests cover:
 
 - command argv is `[COMMAND; selected_candidate]`;
 - selected candidate containing spaces is one argv argument;
@@ -255,22 +253,21 @@ Preview unit tests:
 - timeout renders a deterministic timeout message;
 - output larger than the cap is truncated and marked as truncated;
 - no-selection content does not spawn a command;
-- file/text preview behavior remains unchanged when source is `File_or_text`.
+- file/text preview behavior remains unchanged when source is `File_preview`.
 
-Process-level tests:
+Process-level tests cover:
 
 - invalid CLI combinations fail before interactive mode starts;
 - stdout remains empty for preview diagnostics and validation errors;
 - process tests do not require a real interactive terminal.
 
-The first command-preview implementation should not add an automated test that
-requires a live TTY. Pure unit tests and parser/process validation are enough for
-v0.20.
+The command-preview test suite does not require a live TTY. Pure unit tests and
+parser/process validation are enough for v0.20.
 
 ## Deferred follow-up design
 
-These features should remain deferred until the argv-only command-preview path
-is shipped and tested:
+These features remain deferred until the argv-only command-preview path has more
+real-world usage:
 
 - fixed command arguments;
 - shell-command opt-in mode;

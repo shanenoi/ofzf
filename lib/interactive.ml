@@ -1,5 +1,6 @@
 type preview_state = Preview_state.t = {
   selected_candidate : string option;
+  source : Preview.source;
   content : Preview.content;
   scroll : int;
 }
@@ -13,6 +14,7 @@ type state = {
   marked_candidate_ids : int list;
   multi : bool;
   preview : bool;
+  preview_source : Preview.source;
   preview_position : Preview.position;
   preview_state : preview_state;
 }
@@ -75,7 +77,9 @@ let sync_preview_state ?loader state =
   if not state.preview then { state with preview_state = default_preview_state }
   else
     let selected_candidate = selected_candidate_text ~selected:state.selected state.results in
-    let preview_state = update_preview_state ?loader state.preview_state selected_candidate in
+    let preview_state =
+      update_preview_state ?loader ~source:state.preview_source state.preview_state selected_candidate
+    in
     { state with preview_state }
 
 let recompute candidates state edit =
@@ -97,8 +101,8 @@ let recompute candidates state edit =
   }
       |> sync_preview_state
 
-let initial_state ?(preview = false) ?(multi = false) ?(preview_position = Preview.Right) ?(initial_query = "")
-    candidates =
+let initial_state ?(preview = false) ?(preview_source = Preview.File_preview) ?(multi = false)
+    ?(preview_position = Preview.Right) ?(initial_query = "") candidates =
   let search =
     Search_engine.incremental_search ~context:Search_engine.empty_context
       ~query:initial_query candidates
@@ -112,6 +116,7 @@ let initial_state ?(preview = false) ?(multi = false) ?(preview_position = Previ
     marked_candidate_ids = [];
     multi;
     preview;
+    preview_source;
     preview_position;
     preview_state = default_preview_state;
   }
@@ -196,7 +201,8 @@ let is_multi_toggle_key = function
   | Terminal.Character ' ' -> true
   | _ -> false
 
-let run_loop handle ~preview:handle_preview ~multi:handle_multi ~preview_position:handle_preview_position
+let run_loop handle ~preview:handle_preview ~preview_source:handle_preview_source
+    ~multi:handle_multi ~preview_position:handle_preview_position
     ~initial_query:handle_initial_query candidates =
   let rec loop state =
     let size = Terminal.terminal_size ~handle () in
@@ -259,10 +265,11 @@ let run_loop handle ~preview:handle_preview ~multi:handle_multi ~preview_positio
         | `Query_changed edit -> loop (recompute candidates state edit))
   in
   loop
-    (initial_state ~preview:handle_preview ~multi:handle_multi ~preview_position:handle_preview_position
+    (initial_state ~preview:handle_preview ~preview_source:handle_preview_source
+       ~multi:handle_multi ~preview_position:handle_preview_position
        ~initial_query:handle_initial_query candidates)
 
-let run ~preview ~multi ~preview_position ~initial_query ~candidates =
+let run ~preview ~preview_source ~multi ~preview_position ~initial_query ~candidates =
   if candidates = [] then (
     Debug.log "interactive start failed: empty stdin";
     prerr_endline "ofzf: no candidates on stdin for interactive mode";
@@ -277,7 +284,9 @@ let run ~preview ~multi ~preview_position ~initial_query ~candidates =
         try
           Terminal.enter_alternate_screen handle;
           Terminal.hide_cursor handle;
-          let selected, code = run_loop handle ~preview ~multi ~preview_position ~initial_query candidates in
+          let selected, code =
+            run_loop handle ~preview ~preview_source ~multi ~preview_position ~initial_query candidates
+          in
           cleanup handle;
           (match selected with
           | Some candidates -> List.iter print_endline candidates

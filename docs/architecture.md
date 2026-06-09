@@ -191,13 +191,13 @@ highlighting and selected-row inverse video do not count as visible columns.
 ### Preview state
 
 `lib/preview_state.ml` owns the selected preview candidate, loaded
-`Preview.content`, and preview scroll offset. It reloads preview content only
-when the selected candidate changes, then clamps scroll against the loaded
-content.
+`Preview.content`, preview source identity, and preview scroll offset. It
+reloads preview content only when the selected candidate or preview source
+changes, then clamps scroll against the loaded content.
 
-This split makes preview filesystem access explicit during state updates. The
-rendering path receives `Preview.content` and cannot trigger additional file
-loads.
+This split makes preview filesystem access and command execution explicit during
+state updates. The rendering path receives `Preview.content` and cannot trigger
+additional file loads or process spawns.
 
 ### Debugging
 
@@ -224,11 +224,14 @@ the loaded content bounds.
 ### Preview library
 
 `lib/preview.ml` owns preview layout, candidate classification, file-content
-loading, binary-looking detection, CRLF/LF normalization, and scroll helpers. It
-does not execute commands, invoke a shell, or expand placeholders. Regular files
-are read synchronously up to a conservative 256 KiB limit. Directories, missing
-paths, unreadable paths, binary-looking files, and plain-text candidates all
-produce explicit preview content records for the renderer.
+loading, safe command-preview execution, binary-looking detection, CRLF/LF
+normalization, and scroll helpers. File preview reads regular files
+synchronously up to a conservative 256 KiB limit. Command preview executes one
+configured executable directly, passes the highlighted candidate as one argv
+argument, captures bounded stdout/stderr, and never invokes a shell or expands
+placeholders. Directories, missing paths, unreadable paths, binary-looking
+files, plain-text candidates, and command failures all produce explicit preview
+content records for the renderer.
 
 CLI option validation lives in `Cli` and is order-independent. Preview is an
 interactive-only feature, so preview flags are rejected with `--bench` and
@@ -281,8 +284,15 @@ The architecture leaves room for fzf-style speed improvements:
 5. Parallelize scoring across chunks for non-streaming batch use cases.
 6. Improve terminal redraw minimality.
 7. Cache pre-rendered candidate fragments for large interactive result sets.
-8. Add command-based preview only after the safe preview core is stable.
+8. Extend command preview only after the argv-only, no-shell core has real user
+   feedback.
 
 ### Preview foundation
 
-`lib/preview.ml` owns pure preview layout calculations and safe preview-content helpers. Interactive mode can request no preview, right-side preview, or bottom preview. v0.12 previews readable regular file contents and falls back to clear messages/text for other selected candidates. It deliberately does not execute shell commands or expand placeholders. Tiny terminals hide preview and keep the result list usable.
+`lib/preview.ml` owns pure preview layout calculations and safe preview-content
+helpers. Interactive mode can request no preview, right-side preview, or bottom
+preview. File preview reads readable regular file contents and falls back to
+clear messages/text for other selected candidates. Command preview executes one
+configured executable directly with the highlighted candidate as one argv
+argument. It deliberately does not execute shell strings or expand placeholders.
+Tiny terminals hide preview and keep the result list usable.

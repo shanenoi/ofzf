@@ -17,6 +17,10 @@ type source_kind =
   | Missing_path
   | Unreadable_path
   | Binary_file
+  | Command_output
+  | Command_error
+
+type source = File_preview | Command_preview of string
 
 type classification =
   | Regular_file_path of string
@@ -37,6 +41,7 @@ let min_preview_rows = 3
 let min_result_cols = 20
 let min_preview_cols = 20
 let max_preview_bytes = 256 * 1024
+let preview_command_timeout_ms = 500
 
 let parse_position = function
   | "right" -> Some Right
@@ -180,7 +185,244 @@ let no_selection_content =
     truncated = false;
   }
 
-let content_for_selection ~max_bytes = function
+type captured_stream = {
+  text : string;
+  truncated : bool;
+}
+
+type command_result = {
+  status : Unix.process_status;
+  stdout : captured_stream;
+  stderr : captured_stream;
+}
+
+let command_source command = Command_preview command
+
+let source_to_string = function
+  | File_preview -> "file"
+  | Command_preview command -> "command:" ^ command
+
+let append_capped buffer ~max_bytes ~truncated chunk length =
+  if length <= 0 then truncated
+  else
+    let remaining = max 0 (max_bytes - Buffer.length buffer) in
+    let copy_length = min length remaining in
+    if copy_length > 0 then Buffer.add_subbytes buffer chunk 0 copy_length;
+    truncated || copy_length < length
+
+let read_available fd buffer ~max_bytes ~truncated =
+  let chunk = Bytes.create 4096 in
+  let rec loop truncated =
+    try
+      match Unix.read fd chunk 0 (Bytes.length chunk) with
+      | 0 -> `Closed truncated
+      | count -> loop (append_capped buffer ~max_bytes ~truncated chunk count)
+    with
+    | Unix.Unix_error ((Unix.EAGAIN | Unix.EWOULDBLOCK), _, _) -> `Open truncated
+    | Unix.Unix_error (Unix.EINTR, _, _) -> loop truncated
+  in
+  loop truncated
+
+let close_fd fd = try Unix.close fd with Unix.Unix_error _ -> ()
+
+let waitpid_noerr pid =
+  try ignore (Unix.waitpid [] pid) with Unix.Unix_error _ -> ()
+
+let executable_access path =
+  try
+    let stat = Unix.stat path in
+    if stat.Unix.st_kind = Unix.S_DIR then Error Unix.EACCES
+    else (
+      Unix.access path [ Unix.X_OK ];
+      Ok path)
+  with Unix.Unix_error (error, _, _) -> Error error
+
+let split_path value =
+  value |> String.split_on_char ':' |> List.filter (fun entry -> entry <> "")
+
+let resolve_command command =
+  if command = "" then Error Unix.ENOENT
+  else if contains_char '/' command then executable_access command
+  else
+    let paths =
+      match Sys.getenv_opt "PATH" with
+      | None | Some "" -> [ "/bin"; "/usr/bin" ]
+      | Some value -> split_path value
+    in
+    let rec loop = function
+      | [] -> Error Unix.ENOENT
+      | dir :: rest -> (
+          let path = Filename.concat dir command in
+          match executable_access path with Ok _ as ok -> ok | Error _ -> loop rest)
+    in
+    loop paths
+
+let run_command ~timeout_ms ~max_bytes command candidate =
+  let max_bytes = max 0 max_bytes in
+  match resolve_command command with
+  | Error error -> Error error
+  | Ok executable ->
+  let stdin_fd = Unix.openfile "/dev/null" [ Unix.O_RDONLY ] 0 in
+  let stdout_read, stdout_write = Unix.pipe () in
+  let stderr_read, stderr_write = Unix.pipe () in
+  Fun.protect
+    ~finally:(fun () ->
+      List.iter close_fd [ stdin_fd; stdout_read; stdout_write; stderr_read; stderr_write ])
+    (fun () ->
+      Unix.set_nonblock stdout_read;
+      Unix.set_nonblock stderr_read;
+      let argv = [| command; candidate |] in
+      match
+        try Ok (Unix.create_process executable argv stdin_fd stdout_write stderr_write)
+        with Unix.Unix_error (error, _, _) -> Error error
+      with
+      | Error error -> Error error
+      | Ok pid ->
+          close_fd stdout_write;
+          close_fd stderr_write;
+          let stdout_buffer = Buffer.create (min max_bytes 4096) in
+          let stderr_buffer = Buffer.create (min max_bytes 4096) in
+          let stdout_open = ref true in
+          let stderr_open = ref true in
+          let stdout_truncated = ref false in
+          let stderr_truncated = ref false in
+          let deadline = Unix.gettimeofday () +. (float_of_int timeout_ms /. 1000.0) in
+          let rec poll_status () =
+            try
+              match Unix.waitpid [ Unix.WNOHANG ] pid with
+              | 0, _ -> None
+              | _, status -> Some status
+            with Unix.Unix_error (Unix.ECHILD, _, _) -> Some (Unix.WEXITED 0)
+          in
+          let rec drain_if_ready fd_ref fd buffer truncated =
+            if !fd_ref then
+              match read_available fd buffer ~max_bytes ~truncated:!truncated with
+              | `Open value -> truncated := value
+              | `Closed value ->
+                  truncated := value;
+                  fd_ref := false
+          in
+          let rec loop status =
+            drain_if_ready stdout_open stdout_read stdout_buffer stdout_truncated;
+            drain_if_ready stderr_open stderr_read stderr_buffer stderr_truncated;
+            match status with
+            | Some status when (not !stdout_open) && not !stderr_open ->
+                Ok
+                  {
+                    status;
+                    stdout = { text = Buffer.contents stdout_buffer; truncated = !stdout_truncated };
+                    stderr = { text = Buffer.contents stderr_buffer; truncated = !stderr_truncated };
+                  }
+            | _ -> (
+                let status = match status with Some _ -> status | None -> poll_status () in
+                let remaining = deadline -. Unix.gettimeofday () in
+                if remaining <= 0.0 then (
+                  (match status with
+                  | Some _ -> ()
+                  | None ->
+                      (try Unix.kill pid Sys.sigkill with Unix.Unix_error _ -> ());
+                      waitpid_noerr pid);
+                  Error Unix.ETIMEDOUT)
+                else
+                  let read_fds =
+                    (if !stdout_open then [ stdout_read ] else [])
+                    @ if !stderr_open then [ stderr_read ] else []
+                  in
+                  if read_fds = [] then loop (poll_status ())
+                  else (
+                    ignore (Unix.select read_fds [] [] (min 0.05 remaining));
+                    loop status))
+          in
+          loop None)
+
+let content_lines_for_stream stream = normalize_lines stream.text
+
+let with_truncation_notice stream lines =
+  if stream.truncated then lines @ [ "[preview command output truncated]" ] else lines
+
+let empty_command_output_content =
+  {
+    kind = Command_output;
+    title = "command output";
+    lines = [ "[preview command produced no output]" ];
+    truncated = false;
+  }
+
+let content_for_command_success result =
+  if result.stdout.text <> "" then
+    {
+      kind = Command_output;
+      title = "command output";
+      lines = with_truncation_notice result.stdout (content_lines_for_stream result.stdout);
+      truncated = result.stdout.truncated;
+    }
+  else if result.stderr.text <> "" then
+    {
+      kind = Command_output;
+      title = "command stderr";
+      lines =
+        with_truncation_notice result.stderr
+          ("[preview command wrote stderr]" :: content_lines_for_stream result.stderr);
+      truncated = result.stderr.truncated;
+    }
+  else empty_command_output_content
+
+let process_status_message = function
+  | Unix.WEXITED code -> Printf.sprintf "preview command exited with status %d" code
+  | Unix.WSIGNALED signal -> Printf.sprintf "preview command killed by signal %d" signal
+  | Unix.WSTOPPED signal -> Printf.sprintf "preview command stopped by signal %d" signal
+
+let content_for_command_failure result =
+  let stream = if result.stderr.text <> "" then result.stderr else result.stdout in
+  let lines =
+    match stream.text with
+    | "" -> [ process_status_message result.status ]
+    | _ -> process_status_message result.status :: content_lines_for_stream stream
+  in
+  {
+    kind = Command_error;
+    title = "command failed";
+    lines = with_truncation_notice stream lines;
+    truncated = stream.truncated;
+  }
+
+let content_for_command_error command = function
+  | Unix.ENOENT ->
+      {
+        kind = Command_error;
+        title = "command not found";
+        lines = [ Printf.sprintf "[preview command not found: %s]" command ];
+        truncated = false;
+      }
+  | Unix.ETIMEDOUT ->
+      {
+        kind = Command_error;
+        title = "command timed out";
+        lines =
+          [ Printf.sprintf "[preview command timed out after %d ms]" preview_command_timeout_ms ];
+        truncated = false;
+      }
+  | error ->
+      {
+        kind = Command_error;
+        title = "command could not start";
+        lines =
+          [ Printf.sprintf "[preview command could not start: %s: %s]" command (Unix.error_message error) ];
+        truncated = false;
+      }
+
+let content_for_command ~max_bytes command selected_candidate =
+  match selected_candidate with
+  | None -> no_selection_content
+  | Some candidate -> (
+      match run_command ~timeout_ms:preview_command_timeout_ms ~max_bytes command candidate with
+      | Error error -> content_for_command_error command error
+      | Ok result -> (
+          match result.status with
+          | Unix.WEXITED 0 -> content_for_command_success result
+          | _ -> content_for_command_failure result))
+
+let content_for_file_selection ~max_bytes = function
   | None -> no_selection_content
   | Some candidate -> (
       match classify_candidate candidate with
@@ -227,6 +469,11 @@ let content_for_selection ~max_bytes = function
                   truncated;
                 }))
 
+let content_for_selection ?(source = File_preview) ~max_bytes selected =
+  match source with
+  | File_preview -> content_for_file_selection ~max_bytes selected
+  | Command_preview command -> content_for_command ~max_bytes command selected
+
 let content_line_count content = List.length content.lines
 
 let clamp_scroll ~scroll ~line_count ~visible_rows =
@@ -251,6 +498,8 @@ let kind_to_string = function
   | Missing_path -> "missing"
   | Unreadable_path -> "unreadable"
   | Binary_file -> "binary"
+  | Command_output -> "command"
+  | Command_error -> "command-error"
 
 let format_title ~scroll ~visible_rows content =
   Printf.sprintf "preview: %s: %s%s" (kind_to_string content.kind) content.title

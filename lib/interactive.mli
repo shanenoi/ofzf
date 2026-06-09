@@ -2,6 +2,7 @@
 
 type preview_state = {
   selected_candidate : string option;
+  source : Preview.source;
   content : Preview.content;
   scroll : int;
 }
@@ -100,12 +101,23 @@ val default_preview_state : preview_state
 (** Empty preview state used before a result is selected. *)
 
 val update_preview_state :
-  ?loader:(string option -> Preview.content) -> preview_state -> string option -> preview_state
-(** Reload preview content only when the selected candidate changes. *)
+  ?source:Preview.source ->
+  ?loader:(source:Preview.source -> string option -> Preview.content) ->
+  preview_state ->
+  string option ->
+  preview_state
+(** Reload preview content only when the selected candidate or preview source
+    changes. *)
 
 val clamp_preview_state_scroll : visible_rows:int -> preview_state -> preview_state
 (** Clamp preview scroll based on already-loaded content. *)
 
 val run :
-  preview:bool -> multi:bool -> preview_position:Preview.position -> initial_query:string -> candidates:string list -> int
+  preview:bool ->
+  preview_source:Preview.source ->
+  multi:bool ->
+  preview_position:Preview.position ->
+  initial_query:string ->
+  candidates:string list ->
+  int
 (** Run interactive mode. Returns the intended process exit code. *)

@@ -58,8 +58,9 @@ technical-debt stabilization passes:
 - Optional interactive preview foundation with right-side or bottom layouts.
 - `--preview` previews readable regular files, or falls back to selected
   candidate text for non-path candidates, without executing commands.
-- Safe command-preview behavior is designed in `docs/command_preview.md`, but
-  command execution is not implemented yet.
+- Safe `--preview-command COMMAND` preview support. The selected candidate is
+  passed as one argv argument to `COMMAND`; no shell or `{}` interpolation is
+  used.
 - Preview CLI validation is deterministic: preview is rejected with `--bench`,
   `--limit`, or a standalone `--preview-position`.
 - Preview content is loaded only when the selected candidate changes; rendering
@@ -147,6 +148,10 @@ dune exec ofzf -- --preview --preview-position right < candidates.txt
 ```
 
 ```sh
+dune exec ofzf -- --preview-command cat --preview-position right < candidates.txt
+```
+
+```sh
 dune exec ofzf -- --multi < candidates.txt
 ```
 
@@ -158,6 +163,12 @@ candidate like normal single-select mode.
 With preview enabled, if a selected candidate is a readable regular file path,
 the preview pane shows file contents. It never executes the selected candidate
 as a command.
+
+With command preview enabled, the configured executable is run directly and the
+highlighted candidate is passed as one argv argument. For example,
+`--preview-command cat` previews the selected path by running `cat SELECTED`.
+Complex command strings such as `"cat -n"`, shell expansion, and `{}`
+placeholders are intentionally unsupported in this version.
 
 ```sh
 make test

@@ -15,7 +15,7 @@ features such as multi-select and command-based previews.
 | `Selection` | Selected-row movement, preservation, and pure multi-select candidate-ID helpers. | Terminal IO, candidate loading. |
 | `Viewport` | Result-window calculations using actual layout bounds. | ANSI string construction, filesystem IO. |
 | `Text_width` | UTF-8-safe display width, clipping, and ANSI-width helpers. | Fuzzy matching or scoring. |
-| `Preview` | Preview layout, path classification, file preview loading, preview content normalization, and future safe command-preview execution policy. | Shell interpolation, placeholder expansion, terminal lifecycle. |
+| `Preview` | Preview layout, path classification, file preview loading, safe argv-only command-preview execution, output limits, timeouts, and preview content normalization. | Shell interpolation, placeholder expansion, terminal lifecycle. |
 | `Preview_state` | Selected preview candidate, loaded preview content, preview source identity, and scroll offset. | ANSI frame rendering or process-spawn policy. |
 | `Render` | Pure ANSI frame/result/preview rendering from already-loaded state, including multi-select candidate-ID markers supplied by `Interactive`. | Filesystem IO, selection mutation, and terminal raw-mode lifecycle. |
 | `Terminal` | Raw mode, alternate screen, key parsing, terminal size, ANSI primitives. | Search/ranking policy. |
@@ -27,11 +27,10 @@ The most important purity boundary is: `Render` consumes already-loaded preview
 content and must never call `Preview.content_for_selection` or touch the
 filesystem.
 
-For the planned safe command-preview feature, `Preview` should own argv
-construction, output limits, timeouts, and conversion into `Preview.content`.
-`Render` should still receive only loaded content, and `Terminal`,
-`Search_engine`, `Matcher`, `Scoring`, and `Topk` should remain unaware of
-preview commands.
+For safe command preview, `Preview` owns argv construction, output limits,
+timeouts, and conversion into `Preview.content`. `Render` still receives only
+loaded content, and `Terminal`, `Search_engine`, `Matcher`, `Scoring`, and
+`Topk` remain unaware of preview commands.
 
 ## Test ownership
 

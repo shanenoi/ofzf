@@ -9,7 +9,9 @@ replaces the streaming Top-K bounded-list path with a heap-backed accumulator fo
 large-limit performance. v0.17 wires the existing cursor-aware query-editing
 model into the interactive loop and renderer. v0.18 adds interactive multi-select
 without moving selection mutation into rendering or search. v0.19 records the
-safe command-preview design before any shell-facing preview behavior is added.
+safe command-preview design before any command execution is added. v0.20 ships
+that argv-only command-preview path without adding shell expansion or
+placeholder interpolation.
 
 Completed in this pass:
 
@@ -45,21 +47,22 @@ Completed in this pass:
 - small preview fixtures cover Unicode names, long names, CRLF, binary-looking
   content, directories, and missing paths;
 - `OFZF_DEBUG=1` writes concise diagnostics to stderr without changing stdout.
-- `docs/command_preview.md` defines an argv-only, no-shell command-preview
-  design for v0.20.
+- `docs/command_preview.md` defines the implemented argv-only, no-shell
+  command-preview model;
+- `--preview-command COMMAND` executes a single command directly, captures
+  bounded stdout/stderr, times out long-running previews, and keeps command
+  output out of process stdout.
 
 Deferred work:
 
 - full grapheme-cluster-aware query editing;
-- implementing the argv-only command-preview design;
 - fixed preview-command arguments, shell opt-in, `{}` interpolation, async
   workers, streaming output, custom environments, and multi-selected command
   previews.
 
 Recommended next cleanup order:
 
-1. implement the argv-only command-preview path from `docs/command_preview.md`;
-2. revisit query editing with full grapheme-cluster behavior;
-3. consider extracting an `Interactive_update` module if the event loop grows
+1. revisit query editing with full grapheme-cluster behavior;
+2. consider extracting an `Interactive_update` module if the event loop grows
    during command-preview or richer keybinding work;
-4. consider top-k threshold bailouts after collecting real-world benchmark data.
+3. consider top-k threshold bailouts after collecting real-world benchmark data.

@@ -1,8 +1,8 @@
 # CLI
 
 `ofzf` supports the original non-interactive fuzzy-filter modes plus an
-interactive terminal mode when no query is provided or when `--multi`/`--preview`
-request interactive behavior.
+interactive terminal mode when no query is provided or when `--multi`,
+`--preview`, or `--preview-command` request interactive behavior.
 
 ```sh
 cat input.txt | ofzf QUERY
@@ -10,10 +10,11 @@ cat input.txt | ofzf --limit N QUERY
 cat input.txt | ofzf --bench QUERY
 cat input.txt | ofzf
 cat input.txt | ofzf --multi [QUERY]
+cat input.txt | ofzf --preview-command COMMAND [QUERY]
 ```
 
-No ncurses, mouse support, background indexing, or shell integration is
-implemented in this milestone.
+No ncurses, mouse support, background indexing, shell expansion, or `{}` preview
+placeholder interpolation is implemented in this milestone.
 
 ## Argument handling
 
@@ -27,6 +28,8 @@ Supported forms:
   prints only the selected candidate output to stdout.
 - `ofzf --multi [QUERY]` starts interactive mode with optional initial query and
   prints all marked candidates on Enter.
+- `ofzf --preview-command COMMAND [QUERY]` starts interactive preview mode and
+  runs `COMMAND SELECTED_CANDIDATE` directly for the highlighted row.
 
 Error behavior:
 
@@ -182,9 +185,13 @@ with a clear message. `--preview-position` is valid only when `--preview` is
 also present. `--preview` is intentionally rejected with `--bench` and with
 `--limit N`; benchmark mode and top-k streaming mode stay non-interactive.
 External preview commands, shell expansion, and `{}` placeholder expansion are
-not implemented. The planned safe command-preview design is documented in
-`docs/command_preview.md`; the first implementation should use argv-based
-execution instead of shell strings.
+available through `--preview-command COMMAND`, but only in a conservative argv
+model. The command value must be a single executable name or path without
+whitespace and must not start with `--`. `ofzf` does not use a shell and does
+not expand `{}` placeholders.
+The selected candidate is passed as the command's single extra argv argument.
+For example, `--preview-command cat` runs `cat SELECTED_CANDIDATE` and renders
+captured output in the preview pane only.
 
 Preview can be combined with `--multi`, so users can mark multiple candidates
 while still previewing the highlighted row.
@@ -207,10 +214,20 @@ does not change behavior.
 
 - `--bench --limit N QUERY` is valid and benchmarks limited ranking.
 - `--preview-position right|bottom` requires `--preview`.
+- `--preview-command COMMAND` implies `--preview` and accepts
+  `--preview-position right|bottom`.
+- `--preview-command COMMAND QUERY` treats `QUERY` as the initial interactive
+  query, not as a non-interactive search request.
+- `--preview-command` rejects missing, empty, option-looking, or
+  whitespace-containing command values.
 - `--preview --bench QUERY` and `--bench --preview QUERY` are both rejected.
 - `--preview --limit N QUERY` is rejected because preview is interactive and
   `--limit` belongs to non-interactive/benchmark top-k paths.
+- `--preview-command COMMAND --bench QUERY` and
+  `--preview-command COMMAND --limit N QUERY` are rejected for the same reason.
 - `--multi [QUERY]` is interactive and is valid with `--preview`.
+- `--multi --preview-command COMMAND [QUERY]` is valid; command preview follows
+  only the highlighted row, not every marked row.
 - `--multi --bench QUERY` and `--multi --limit N QUERY` are rejected because
   multi-select is an interactive UI feature.
 - invalid `--preview-position` values are rejected before interactive mode starts.

@@ -4,7 +4,7 @@ let () =
   let open Ofzf.Preview_state in
   assert_true "initial no selection" (default.selected_candidate = None);
   let loads = ref 0 in
-  let loader selected =
+  let loader ~source:_ selected =
     incr loads;
     match selected with
     | None -> Ofzf.Preview.no_selection_content
@@ -18,6 +18,9 @@ let () =
   let changed = update ~loader scrolled (Some "beta") in
   assert_true "changed candidate reloads" (!loads = 2);
   assert_true "changed candidate resets scroll" (changed.scroll = 0);
+  let source_changed = update ~source:(Ofzf.Preview.command_source "echo") ~loader changed (Some "beta") in
+  assert_true "changed source reloads" (!loads = 3);
+  assert_true "changed source is stored" (source_changed.source = Ofzf.Preview.command_source "echo");
   assert_true "scroll delta line" (scroll_delta ~visible_rows:3 Ofzf.Terminal.Ctrl_e = Some 1);
   assert_true "scroll delta page" (scroll_delta ~visible_rows:3 Ofzf.Terminal.Ctrl_f = Some 3);
 

@@ -19,6 +19,7 @@ let () =
       limit = None;
       mode = Interactive;
       preview = false;
+      preview_command = None;
       preview_position = Preview_right;
       multi = false;
     };
@@ -28,6 +29,7 @@ let () =
       limit = None;
       mode = Search;
       preview = false;
+      preview_command = None;
       preview_position = Preview_right;
       multi = false;
     };
@@ -37,6 +39,7 @@ let () =
       limit = Some 2;
       mode = Search;
       preview = false;
+      preview_command = None;
       preview_position = Preview_right;
       multi = false;
     };
@@ -46,6 +49,7 @@ let () =
       limit = Some 2;
       mode = Bench;
       preview = false;
+      preview_command = None;
       preview_position = Preview_right;
       multi = false;
     };
@@ -55,6 +59,7 @@ let () =
       limit = Some 2;
       mode = Bench;
       preview = false;
+      preview_command = None;
       preview_position = Preview_right;
       multi = false;
     };
@@ -64,6 +69,7 @@ let () =
       limit = None;
       mode = Interactive;
       preview = true;
+      preview_command = None;
       preview_position = Preview_right;
       multi = false;
     };
@@ -73,6 +79,7 @@ let () =
       limit = None;
       mode = Interactive;
       preview = true;
+      preview_command = None;
       preview_position = Preview_bottom;
       multi = false;
     };
@@ -82,6 +89,7 @@ let () =
       limit = None;
       mode = Interactive;
       preview = false;
+      preview_command = None;
       preview_position = Preview_right;
       multi = true;
     };
@@ -91,6 +99,7 @@ let () =
       limit = None;
       mode = Interactive;
       preview = false;
+      preview_command = None;
       preview_position = Preview_right;
       multi = true;
     };
@@ -100,6 +109,47 @@ let () =
       limit = None;
       mode = Interactive;
       preview = true;
+      preview_command = None;
+      preview_position = Preview_right;
+      multi = true;
+    };
+  assert_cli_ok "parse preview command no query" [ "ofzf"; "--preview-command"; "cat" ]
+    {
+      query = "";
+      limit = None;
+      mode = Interactive;
+      preview = true;
+      preview_command = Some "cat";
+      preview_position = Preview_right;
+      multi = false;
+    };
+  assert_cli_ok "parse preview command with initial query" [ "ofzf"; "--preview-command"; "cat"; "abc" ]
+    {
+      query = "abc";
+      limit = None;
+      mode = Interactive;
+      preview = true;
+      preview_command = Some "cat";
+      preview_position = Preview_right;
+      multi = false;
+    };
+  assert_cli_ok "parse preview command bottom" [ "ofzf"; "--preview-command"; "cat"; "--preview-position"; "bottom" ]
+    {
+      query = "";
+      limit = None;
+      mode = Interactive;
+      preview = true;
+      preview_command = Some "cat";
+      preview_position = Preview_bottom;
+      multi = false;
+    };
+  assert_cli_ok "parse preview command multi" [ "ofzf"; "--multi"; "--preview-command"; "cat"; "abc" ]
+    {
+      query = "abc";
+      limit = None;
+      mode = Interactive;
+      preview = true;
+      preview_command = Some "cat";
       preview_position = Preview_right;
       multi = true;
     };
@@ -112,6 +162,11 @@ let () =
   assert_cli_error "bench preview rejected" [ "ofzf"; "--bench"; "--preview"; "abc" ];
   assert_cli_error "preview bench rejected regardless of order" [ "ofzf"; "--preview"; "--bench"; "abc" ];
   assert_cli_error "preview limit rejected" [ "ofzf"; "--preview"; "--limit"; "2"; "abc" ];
+  assert_cli_error "preview command missing value" [ "ofzf"; "--preview-command" ];
+  assert_cli_error "preview command rejects option-looking value" [ "ofzf"; "--preview-command"; "--bench" ];
+  assert_cli_error "preview command rejects whitespace" [ "ofzf"; "--preview-command"; "cat -n" ];
+  assert_cli_error "preview command bench rejected" [ "ofzf"; "--preview-command"; "cat"; "--bench"; "abc" ];
+  assert_cli_error "preview command limit rejected" [ "ofzf"; "--preview-command"; "cat"; "--limit"; "2"; "abc" ];
   assert_cli_error "multi bench rejected" [ "ofzf"; "--multi"; "--bench"; "abc" ];
   assert_cli_error "multi limit rejected" [ "ofzf"; "--multi"; "--limit"; "2"; "abc" ];
   assert_contains "invalid combo message" ~needle:"cannot be combined"

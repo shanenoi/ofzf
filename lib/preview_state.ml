@@ -1,27 +1,30 @@
 type t = {
   selected_candidate : string option;
+  source : Preview.source;
   content : Preview.content;
   scroll : int;
 }
 
 let default = {
   selected_candidate = None;
+  source = Preview.File_preview;
   content = Preview.no_selection_content;
   scroll = 0;
 }
 
-let load_content selected_candidate =
-  Preview.content_for_selection ~max_bytes:Preview.max_preview_bytes selected_candidate
+let load_content ~source selected_candidate =
+  Preview.content_for_selection ~source ~max_bytes:Preview.max_preview_bytes selected_candidate
 
-let update ?(loader = load_content) previous selected_candidate =
-  if previous.selected_candidate = selected_candidate then previous
+let update ?(source = Preview.File_preview) ?(loader = load_content) previous selected_candidate =
+  if previous.selected_candidate = selected_candidate && previous.source = source then previous
   else
-    let content = loader selected_candidate in
-    Debug.logf "preview reload selected=%b kind=%s line_count=%d"
+    let content = loader ~source selected_candidate in
+    Debug.logf "preview reload selected=%b source=%s kind=%s line_count=%d"
       (Option.is_some selected_candidate)
+      (Preview.source_to_string source)
       (Debug.preview_kind_to_string content.Preview.kind)
       (Preview.content_line_count content);
-    { selected_candidate; content; scroll = 0 }
+    { selected_candidate; source; content; scroll = 0 }
 
 let clamp_scroll ~visible_rows state =
   let line_count = Preview.content_line_count state.content in

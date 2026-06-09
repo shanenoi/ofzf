@@ -8,13 +8,13 @@ cat input.txt | ofzf
 ```
 
 It remains an MVP: preview is synchronous and intentionally limited, with no
-mouse support, no ncurses, and no shell integration.
+mouse support, no ncurses, no shell integration, and no `{}` interpolation.
 
 ## Mode selection
 
-The CLI selects interactive mode when no query is provided, when `--preview` is
-used, or when `--multi` is used. Existing non-interactive modes remain backward
-compatible:
+The CLI selects interactive mode when no query is provided, when `--preview` or
+`--preview-command` is used, or when `--multi` is used. Existing
+non-interactive modes remain backward compatible:
 
 ```sh
 cat input.txt | ofzf QUERY
@@ -178,7 +178,8 @@ compact cached references, and background indexing.
 
 ## Current limitations
 
-- Preview is synchronous and file/text-only; command-based preview is deferred.
+- Preview is synchronous. Command preview is argv-only, timeout-bounded, and
+  does not support shells, fixed arguments, or `{}` interpolation.
 - No mouse support.
 - Resize handling is signal-aware but still full-frame rather than partial.
 - Query editing avoids splitting UTF-8 byte sequences where practical, but it is
@@ -210,15 +211,20 @@ falls back to the normal full-width result window.
 
 Right-side preview is used by default. Bottom preview can be selected with `--preview-position bottom`. Tiny terminals hide preview rather than rendering past bounds.
 
-## v0.12 preview file content and scrolling
+## Preview file/command content and scrolling
 
-When preview mode is enabled, the interactive loop asks `Preview` to load a
-content record when the selected candidate changes. Rendering receives the
-already-loaded content and does not perform filesystem IO while building frame
-lines. The selected candidate is previewed as file content only when it is a
-readable regular file. Directories, missing paths, unreadable paths,
-binary-looking files, and plain text candidates render explicit fallback
-messages/content.
+When preview mode is enabled, the interactive loop asks `Preview_state` to load
+a content record when the selected candidate or preview source changes.
+Rendering receives the already-loaded content and does not perform filesystem IO
+or process spawning while building frame lines. Plain `--preview` previews
+readable regular files and uses explicit fallback messages/content for
+directories, missing paths, unreadable paths, binary-looking files, and plain
+text candidates.
+
+`--preview-command COMMAND` switches the preview source to command output. The
+highlighted candidate is passed as one argv argument to `COMMAND`; no shell is
+used and no placeholders are expanded. Captured stdout/stderr is converted into
+preview content and never written to process stdout.
 
 Preview scroll state is separate from result-list selection. Alt-Up/Ctrl-Y and
 Alt-Down/Ctrl-E scroll by one preview line. Ctrl-B and Ctrl-F scroll by one
@@ -226,9 +232,9 @@ preview page. Page Up and Page Down remain result-list navigation keys. The
 scroll offset is clamped to the loaded content bounds and resets when the
 selected candidate changes or the query is recomputed.
 
-Preview rendering remains synchronous and ANSI-only. The current milestone still
-avoids async workers, arbitrary preview commands, shell expansion, and `{}`
-placeholder expansion.
+Preview rendering remains synchronous and ANSI-only. Command preview still
+avoids async workers, arbitrary command strings, shell expansion, fixed command
+arguments, and `{}` placeholder expansion.
 
 Right-preview row padding uses ANSI-aware width accounting so highlight and
 inverse-video escape sequences do not count as visible columns. Non-interactive

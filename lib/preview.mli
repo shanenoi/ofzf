@@ -22,7 +22,13 @@ type source_kind =
   | Missing_path
   | Unreadable_path
   | Binary_file
+  | Command_output
+  | Command_error
 (** Preview source classification for display and tests. *)
+
+type source = File_preview | Command_preview of string
+(** Preview loading source. [Command_preview command] executes [command] without a
+    shell and passes the selected candidate as one argv argument. *)
 
 type classification =
   | Regular_file_path of string
@@ -46,6 +52,16 @@ val min_result_cols : int
 val min_preview_cols : int
 val max_preview_bytes : int
 (** Conservative maximum bytes read from a preview file. *)
+
+val preview_command_timeout_ms : int
+(** Conservative synchronous timeout for command preview execution. *)
+
+val command_source : string -> source
+(** Build a command-preview source for callers that should not depend on the
+    variant representation. *)
+
+val source_to_string : source -> string
+(** Stable source label used by preview-state identity and diagnostics. *)
 
 val parse_position : string -> position option
 (** Parse [right] or [bottom]. *)
@@ -77,8 +93,10 @@ val normalize_lines : string -> string list
 val content_of_candidate_text : string -> content
 (** Build preview content for a candidate that should be rendered as plain text. *)
 
-val content_for_selection : max_bytes:int -> string option -> content
-(** Load preview content for the selected candidate without shell execution. *)
+val content_for_selection : ?source:source -> max_bytes:int -> string option -> content
+(** Load preview content for the selected candidate. File preview never executes
+    commands. Command preview executes only the configured executable directly,
+    without shell expansion or placeholder interpolation. *)
 
 val no_selection_content : content
 (** Prebuilt content for the no-selection preview state. *)

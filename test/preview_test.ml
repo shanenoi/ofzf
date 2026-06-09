@@ -45,6 +45,68 @@ let () =
   let binary = Ofzf.Preview.content_for_selection ~max_bytes:Ofzf.Preview.max_preview_bytes (Some binary_file) in
   assert_true "binary-looking content kind" (binary.kind = Ofzf.Preview.Binary_file);
   assert_true "binary content not logged/rendered" (List.exists (contains ~needle:"binary-looking") binary.lines);
+  let command_echo =
+    Ofzf.Preview.content_for_selection ~source:(Ofzf.Preview.command_source "echo")
+      ~max_bytes:Ofzf.Preview.max_preview_bytes (Some "hello; echo unsafe")
+  in
+  assert_true "command preview stdout kind" (command_echo.kind = Ofzf.Preview.Command_output);
+  assert_equal_string_list "command preview passes candidate as argv"
+    [ "hello; echo unsafe" ] command_echo.lines;
+  assert_not_contains "command preview does not shell-expand candidate" ~needle:"unsafe\nunsafe"
+    (String.concat "\n" command_echo.lines);
+  let command_empty =
+    Ofzf.Preview.content_for_selection ~source:(Ofzf.Preview.command_source "true")
+      ~max_bytes:Ofzf.Preview.max_preview_bytes (Some "ignored")
+  in
+  assert_true "empty command output kind" (command_empty.kind = Ofzf.Preview.Command_output);
+  assert_contains "empty command output message" ~needle:"produced no output"
+    (String.concat "\n" command_empty.lines);
+  let command_failure =
+    Ofzf.Preview.content_for_selection ~source:(Ofzf.Preview.command_source "false")
+      ~max_bytes:Ofzf.Preview.max_preview_bytes (Some "ignored")
+  in
+  assert_true "non-zero command output kind" (command_failure.kind = Ofzf.Preview.Command_error);
+  assert_contains "non-zero command status" ~needle:"exited with status"
+    (String.concat "\n" command_failure.lines);
+  with_temp_dir (fun dir ->
+      let stderr_script = Filename.concat dir "stderr-preview" in
+      write_file stderr_script "#!/bin/sh\nprintf '%s\\n' \"$1\" >&2\n";
+      Unix.chmod stderr_script 0o700;
+      let command_stderr =
+        Ofzf.Preview.content_for_selection ~source:(Ofzf.Preview.command_source stderr_script)
+          ~max_bytes:Ofzf.Preview.max_preview_bytes (Some "stderr only")
+      in
+      assert_true "successful stderr command is output content"
+        (command_stderr.kind = Ofzf.Preview.Command_output);
+      assert_contains "successful stderr is labeled" ~needle:"wrote stderr"
+        (String.concat "\n" command_stderr.lines);
+      assert_contains "successful stderr is captured" ~needle:"stderr only"
+        (String.concat "\n" command_stderr.lines));
+  let command_missing =
+    Ofzf.Preview.content_for_selection
+      ~source:(Ofzf.Preview.command_source "ofzf-preview-command-that-does-not-exist")
+      ~max_bytes:Ofzf.Preview.max_preview_bytes (Some "ignored")
+  in
+  assert_true "missing command output kind" (command_missing.kind = Ofzf.Preview.Command_error);
+  assert_contains "missing command message" ~needle:"not found"
+    (String.concat "\n" command_missing.lines);
+  let command_timeout =
+    Ofzf.Preview.content_for_selection ~source:(Ofzf.Preview.command_source "sleep")
+      ~max_bytes:Ofzf.Preview.max_preview_bytes (Some "2")
+  in
+  assert_true "timeout command output kind" (command_timeout.kind = Ofzf.Preview.Command_error);
+  assert_contains "timeout command message" ~needle:"timed out"
+    (String.concat "\n" command_timeout.lines);
+  with_temp_dir (fun dir ->
+      let large_path = Filename.concat dir "large.txt" in
+      write_file large_path "abcdef\n";
+      let command_truncated =
+        Ofzf.Preview.content_for_selection ~source:(Ofzf.Preview.command_source "cat")
+          ~max_bytes:3 (Some large_path)
+      in
+      assert_true "command output truncates" command_truncated.truncated;
+      assert_contains "command truncation notice" ~needle:"truncated"
+        (String.concat "\n" command_truncated.lines));
   let clipped =
     Ofzf.Preview.render_content_lines ~terminal_width:3 ~height:3 ~scroll:0
       { Ofzf.Preview.kind = Ofzf.Preview.Regular_file; title = "unicode"; lines = [ "界abc" ]; truncated = false }

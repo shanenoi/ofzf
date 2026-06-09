@@ -14,6 +14,7 @@ type config = {
   limit : int option;
   mode : mode;
   preview : bool;
+  preview_command : string option;
   preview_position : preview_position;
   multi : bool;
 }
@@ -25,6 +26,8 @@ type error =
   | Negative_limit of int
   | Invalid_preview_position of string
   | Missing_preview_position
+  | Missing_preview_command
+  | Invalid_preview_command of string
   | Preview_position_without_preview
   | Preview_conflicts_with_bench
   | Preview_conflicts_with_limit
@@ -41,12 +44,17 @@ val parse : string array -> (config, error) result
     - [ofzf --bench QUERY]
     - [ofzf --bench --limit N QUERY]
     - [ofzf --preview [QUERY]]
+    - [ofzf --preview-command COMMAND [QUERY]]
     - [ofzf --preview --preview-position right|bottom [QUERY]]
     - [ofzf --multi [QUERY]]
 
     Preview mode is intentionally rejected when combined with [--bench] or
-    [--limit]. [--preview-position] is valid only with [--preview]. Multi mode
-    starts the interactive UI and is rejected with [--bench] or [--limit]. *)
+    [--limit]. [--preview-command] implies preview mode, accepts only a single
+    executable name/path without whitespace and not starting with [--], and
+    starts the interactive UI.
+    [--preview-position] is valid only with [--preview] or [--preview-command].
+    Multi mode starts the interactive UI and is rejected with [--bench] or
+    [--limit]. *)
 
 val usage : string -> string
 (** Usage text for the executable name. *)
