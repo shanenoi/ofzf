@@ -5,7 +5,6 @@ description:
   "ofzf is an educational, dependency-light fuzzy finder project inspired by fzf."
 license: "MIT"
 homepage: "https://github.com/shanenoi/ofzf"
-dev-repo: "git+https://github.com/shanenoi/ofzf.git"
 depends: [
   "ocaml"
   "dune" {>= "3.11"}
@@ -25,3 +24,4 @@ build: [
     "@doc" {with-doc}
   ]
 ]
+dev-repo: "git+https://github.com/shanenoi/ofzf.git"
